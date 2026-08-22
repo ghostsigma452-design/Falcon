@@ -14,37 +14,8 @@ type
 proc isComplete*(indices: QueueFamilyIndices): bool =
   indices.graphicsFamily != -1 and indices.presentFamily != -1
 
-# Load procedures required for physical and logical device creation
-proc loadDeviceCreationProcs*(instance: VkInstance) =
-  loadInstProc(instance, vkEnumeratePhysicalDevices)
-  loadInstProc(instance, vkGetPhysicalDeviceProperties)
-  loadInstProc(instance, vkGetPhysicalDeviceFeatures)
-  loadInstProc(instance, vkGetPhysicalDeviceQueueFamilyProperties)
-  loadInstProc(instance, vkGetPhysicalDeviceSurfaceSupportKHR)
-  loadInstProc(instance, vkCreateDevice)
 
-proc loadPhysicalDeviceProcs*(instance: VkInstance) =
-  loadInstProc(instance, vkEnumeratePhysicalDevices)
-  loadInstProc(instance, vkGetPhysicalDeviceProperties)
-  loadInstProc(instance, vkGetPhysicalDeviceFeatures)
-  loadInstProc(instance, vkGetPhysicalDeviceQueueFamilyProperties)
-  loadInstProc(instance, vkGetPhysicalDeviceSurfaceSupportKHR)
-  loadInstProc(instance, vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
-  loadInstProc(instance, vkGetPhysicalDeviceSurfaceFormatsKHR)
-  loadInstProc(instance, vkGetPhysicalDeviceSurfacePresentModesKHR)
-  loadInstProc(instance, vkCreateDevice)
 
-# Load device-level procedure pointers dynamically
-proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
-  # Fetch vkGetDeviceProcAddr using the valid VkInstance handle
-  getDeviceProcAddr = cast[GetDeviceProcAddrProc](getInstanceProcAddr(instance, "vkGetDeviceProcAddr"))
-  if getDeviceProcAddr == nil:
-    raise newException(Exception, "Failed to load vkGetDeviceProcAddr handle")
-
-  # Now getDeviceProcAddr is valid and won't crash when called here:
-  loadDevProc(device, vkGetDeviceQueue)
-  loadDevProc(device, vkDestroyDevice)
-  loadDevProc(device, vkDeviceWaitIdle)
 
 proc findQueueFamilies*(device: VkPhysicalDevice, surface: VkSurfaceKHR): QueueFamilyIndices =
   var queueCount: uint32 = 0

@@ -89,3 +89,88 @@ proc loadDeviceProcs*(device: VkDevice) =
   loadDevProc(device, vkAcquireNextImageKHR)
   loadDevProc(device, vkQueueSubmit)
   loadDevProc(device, vkQueuePresentKHR)
+
+proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
+  getDeviceProcAddr = cast[GetDeviceProcAddrProc](getInstanceProcAddr(instance, "vkGetDeviceProcAddr"))
+  if getDeviceProcAddr == nil:
+    raise newException(Exception, "Failed to load vkGetDeviceProcAddr handle")
+
+  # Device & Queue
+  loadDevProc(device, vkGetDeviceQueue)
+  loadDevProc(device, vkDestroyDevice)
+  loadDevProc(device, vkDeviceWaitIdle)
+
+  # Command Pools & Command Buffers
+  loadDevProc(device, vkCreateCommandPool)
+  loadDevProc(device, vkDestroyCommandPool)
+  loadDevProc(device, vkResetCommandPool)
+  loadDevProc(device, vkAllocateCommandBuffers)
+  loadDevProc(device, vkFreeCommandBuffers)
+  loadDevProc(device, vkBeginCommandBuffer)
+  loadDevProc(device, vkEndCommandBuffer)
+  loadDevProc(device, vkResetCommandBuffer)
+  loadDevProc(device, vkCmdCopyBuffer)
+
+  # Drawing & RenderPass Commands
+  loadDevProc(device, vkCmdBeginRenderPass)
+  loadDevProc(device, vkCmdEndRenderPass)
+  loadDevProc(device, vkCmdBindPipeline)
+  loadDevProc(device, vkCmdSetViewport)
+  loadDevProc(device, vkCmdSetScissor)
+  loadDevProc(device, vkCmdDraw)
+
+  # Swapchain & Image Views
+  loadDevProc(device, vkCreateSwapchainKHR)
+  loadDevProc(device, vkDestroySwapchainKHR)
+  loadDevProc(device, vkGetSwapchainImagesKHR)
+  loadDevProc(device, vkAcquireNextImageKHR)
+  loadDevProc(device, vkQueuePresentKHR)
+  loadDevProc(device, vkCreateImageView)
+  loadDevProc(device, vkDestroyImageView)
+
+  # Render Pass & Framebuffers
+  loadDevProc(device, vkCreateRenderPass)
+  loadDevProc(device, vkDestroyRenderPass)
+  loadDevProc(device, vkCreateFramebuffer)
+  loadDevProc(device, vkDestroyFramebuffer)
+
+  # Shaders & Pipeline
+  loadDevProc(device, vkCreateShaderModule)
+  loadDevProc(device, vkDestroyShaderModule)
+  loadDevProc(device, vkCreatePipelineLayout)
+  loadDevProc(device, vkDestroyPipelineLayout)
+  loadDevProc(device, vkCreateGraphicsPipelines)
+  loadDevProc(device, vkDestroyPipeline)
+
+  # Synchronization
+  loadDevProc(device, vkCreateSemaphore)
+  loadDevProc(device, vkDestroySemaphore)
+  loadDevProc(device, vkCreateFence)
+  loadDevProc(device, vkDestroyFence)
+  loadDevProc(device, vkWaitForFences)
+  loadDevProc(device, vkResetFences)
+
+
+  # Queue Submission & Sync
+  loadDevProc(device, vkQueueSubmit)
+  loadDevProc(device, vkQueueWaitIdle)
+
+# Load procedures required for physical and logical device creation
+proc loadDeviceCreationProcs*(instance: VkInstance) =
+  loadInstProc(instance, vkEnumeratePhysicalDevices)
+  loadInstProc(instance, vkGetPhysicalDeviceProperties)
+  loadInstProc(instance, vkGetPhysicalDeviceFeatures)
+  loadInstProc(instance, vkGetPhysicalDeviceQueueFamilyProperties)
+  loadInstProc(instance, vkGetPhysicalDeviceSurfaceSupportKHR)
+  loadInstProc(instance, vkCreateDevice)
+
+proc loadPhysicalDeviceProcs*(instance: VkInstance) =
+  loadInstProc(instance, vkEnumeratePhysicalDevices)
+  loadInstProc(instance, vkGetPhysicalDeviceProperties)
+  loadInstProc(instance, vkGetPhysicalDeviceFeatures)
+  loadInstProc(instance, vkGetPhysicalDeviceQueueFamilyProperties)
+  loadInstProc(instance, vkGetPhysicalDeviceSurfaceSupportKHR)
+  loadInstProc(instance, vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+  loadInstProc(instance, vkGetPhysicalDeviceSurfaceFormatsKHR)
+  loadInstProc(instance, vkGetPhysicalDeviceSurfacePresentModesKHR)
+  loadInstProc(instance, vkCreateDevice)
