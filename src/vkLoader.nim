@@ -150,6 +150,25 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkWaitForFences)
   loadDevProc(device, vkResetFences)
 
+  # Buffers & Device Memory
+  loadDevProc(device, vkCreateBuffer)
+  loadDevProc(device, vkDestroyBuffer)
+  loadDevProc(device, vkGetBufferMemoryRequirements)
+  loadDevProc(device, vkAllocateMemory)
+  loadDevProc(device, vkFreeMemory)
+  loadDevProc(device, vkBindBufferMemory)
+  loadDevProc(device, vkMapMemory)
+  loadDevProc(device, vkUnmapMemory)
+
+  # Descriptor Sets (For SSBOs)
+  loadDevProc(device, vkCreateDescriptorSetLayout)
+  loadDevProc(device, vkDestroyDescriptorSetLayout)
+  loadDevProc(device, vkCreateDescriptorPool)
+  loadDevProc(device, vkDestroyDescriptorPool)
+  loadDevProc(device, vkAllocateDescriptorSets)
+  loadDevProc(device, vkUpdateDescriptorSets)
+  loadDevProc(device, vkCmdBindDescriptorSets)
+
 
   # Queue Submission & Sync
   loadDevProc(device, vkQueueSubmit)

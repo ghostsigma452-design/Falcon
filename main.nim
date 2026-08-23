@@ -1,77 +1,159 @@
 import falcon
+import math
+import vk14
 
-var win = newVulkanWindow("Falcon", 1000, 1000)
 
-# 1. Load instance procs for physical device inspection
+
+type
+  Vec4 = array[4, float32]
+  Mat4 = array[16, float32]
+
+  GPUVertex = object
+    pos: Vec4
+    color: Vec4
+
+  GPUSceneData = object
+    mvp: Mat4
+
+# Simple Rotation Matrix around Y & X axes
+proc rotateY(angle: float32): Mat4 =
+  let c = cos(angle)
+  let s = sin(angle)
+  result = [
+     c,    0.0f,  s,    0.0f,
+     0.0f, 1.0f,  0.0f, 0.0f,
+    -s,    0.0f,  c,    0.0f,
+     0.0f, 0.0f,  0.0f, 1.0f
+  ]
+
+var win = newVulkanWindow("Falcon Engine - SSBO Cube", 1000, 1000)
+
 loadPhysicalDeviceProcs(win.vkInstance)
-
-  # 2. Pick GPU and locate queue families
 let (physicalDevice, queueIndices) = pickPhysicalDevice(win.vkInstance, win.vkSurface)
-
-echo "Graphics Queue Family Index: ", queueIndices.graphicsFamily
-echo "Present Queue Family Index: ", queueIndices.presentFamily
-
 let dev = newVulkanDevice(win.vkInstance, physicalDevice, queueIndices)
-loadLogicalDeviceProcs(win.vkInstance, dev.logicalDevice) # <--- MAKE SURE THIS IS HERE
-echo "Logical Device created successfully: ", cast[uint64](dev.logicalDevice)
+loadLogicalDeviceProcs(win.vkInstance, dev.logicalDevice)
 
-
-let swapchain = newVulkanSwapchain(
-    physicalDevice,
-    dev.logicalDevice,
-    win.vkSurface,
-    queueIndices,
-    1000,
-    1000
-  )
-
-
-  # 2. Create RenderPass matching Swapchain format
+let swapchain = newVulkanSwapchain(physicalDevice, dev.logicalDevice, win.vkSurface, queueIndices, 1000, 1000)
 let renderPass = newVulkanRenderPass(dev.logicalDevice, swapchain.format)
-
-
-
 swapchain.createFramebuffers(renderPass.renderPass)
 
-echo "Swapchain, RenderPass, and ", swapchain.framebuffers.len, " Framebuffers ready!"
+# 3D Cube Vertices (36 indices forming 12 triangles)
+let cubeVertices: array[36, GPUVertex] = [
+  # Front
+  GPUVertex(pos: [-0.5f, -0.5f,  0.5f, 1.0f], color: [1.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f,  0.5f, 1.0f], color: [0.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f,  0.5f, 1.0f], color: [1.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f,  0.5f, 1.0f], color: [1.0f, 0.0f, 0.0f, 1.0f]),
 
-let pipeline = newVulkanPipeline(
-  dev.logicalDevice,
-  renderPass.renderPass,
-  swapchain.extent,
-  "shaders/vert.spv", # path to vertex shader
-  "shaders/frag.spv"  # path to fragment shader
+  # Back
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+
+  # Left
+  GPUVertex(pos: [-0.5f,  0.5f,  0.5f, 1.0f], color: [1.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f,  0.5f, 1.0f], color: [1.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f,  0.5f, 1.0f], color: [1.0f, 1.0f, 0.0f, 1.0f]),
+
+  # Right
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f,  0.5f, 1.0f], color: [0.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+
+  # Top
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f,  0.5f, 1.0f], color: [0.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f, -0.5f,  0.5f, 1.0f], color: [0.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f,  0.5f, 1.0f], color: [1.0f, 0.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f, -0.5f, -0.5f, 1.0f], color: [0.0f, 1.0f, 1.0f, 1.0f]),
+
+  # Bottom
+  GPUVertex(pos: [-0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f,  0.5f, 1.0f], color: [1.0f, 1.0f, 0.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f,  0.5f, 1.0f], color: [0.0f, 0.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [ 0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f]),
+  GPUVertex(pos: [-0.5f,  0.5f, -0.5f, 1.0f], color: [1.0f, 0.0f, 1.0f, 1.0f])
+]
+
+# 1. Allocate SSBOs (Vertices + Scene Matrix)
+let vertexFlags = cast[VkMemoryPropertyFlags](
+  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.uint32 or 
+  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.uint32
 )
 
-echo "Graphics Pipeline successfully initialized!"
-
-let renderer = newVulkanRenderer(
+let vertexSSBO = newVulkanBuffer(
+  physicalDevice,
   dev.logicalDevice,
-  queueIndices.graphicsFamily.uint32,
-  queueIndices.presentFamily.uint32
+  (sizeof(GPUVertex) * cubeVertices.len).VkDeviceSize,
+  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.VkBufferUsageFlags,
+  vertexFlags
+)
+vertexSSBO.copyData(unsafeAddr cubeVertices[0], (sizeof(GPUVertex) * cubeVertices.len).VkDeviceSize)
+
+let sceneSSBO = newVulkanBuffer(
+  physicalDevice,
+  dev.logicalDevice,
+  sizeof(GPUSceneData).VkDeviceSize,
+  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.VkBufferUsageFlags,
+  vertexFlags
 )
 
-echo "Falcon Engine initialised successfully! Rendering RGB triangle..."
+# 2. Setup Descriptors and Pipeline
+let ssboPack = newSSBOPack(dev.logicalDevice, vertexSSBO, sceneSSBO)
+let pipeline = newVulkanPipeline(dev.logicalDevice, renderPass.renderPass, swapchain.extent, ssboPack.layout, "shaders/vert.spv", "shaders/frag.spv")
+let renderer = newVulkanRenderer(win.vkInstance,dev.logicalDevice, queueIndices.graphicsFamily.uint32, queueIndices.presentFamily.uint32)
+
+echo "Falcon Engine initialised successfully! Rendering SSBO 3D Cube..."
 
 var event: Event
 var running = true
+var angle: float32 = 0.0f
 
-# Main Loop
 while running:
   while pollEvent(event):
     if event.kind == QuitEvent:
       running = false
 
-  renderer.drawFrame(swapchain, renderPass.renderPass, pipeline)
+  # Update Rotation Angle and Upload to Scene SSBO
+  angle += 0.001f
+  var sceneData = GPUSceneData(mvp: rotateY(angle))
+  sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
 
-# --- Correct Reverse Cleanup Order ---
+  if vkCmdBeginRenderPass == nil:
+    raise newException(Exception, "vkCmdBeginRenderPass pointer is NIL! Check Vkloader proc loading.")
+  if cast[uint64](renderPass) == 0:
+    raise newException(Exception, "renderPass handle is null!")
+
+  # Checks the Nim ref pointer
+  echo "Nim Ref Object exists: ", renderPass != nil 
+
+# Checks the actual Vulkan handle (likely 0!)
+  echo "Raw VkRenderPass handle: ", cast[uint64](renderPass.renderPass)
+
+
+
+  renderer.drawFrame(swapchain, renderPass.renderPass, pipeline, ssboPack, cubeVertices.len.uint32)
+
+# Cleanup
 renderer.cleanup()
 pipeline.cleanup()
-swapchain.cleanup()   # 1. Destroys Framebuffers, Image Views, and Swapchain
-renderPass.cleanup()  # 2. Destroys RenderPass
-dev.cleanup()         # 3. Destroys Logical Device (was missing)
-win.cleanup()         # 4. Destroys Surface, Instance, and Window LAST
-
-
-
-  
+ssboPack.cleanup()
+vertexSSBO.cleanup()
+sceneSSBO.cleanup()
+swapchain.cleanup()
+renderPass.cleanup()
+dev.cleanup()
+win.cleanup()

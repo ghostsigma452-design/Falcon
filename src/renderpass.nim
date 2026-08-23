@@ -9,10 +9,10 @@ proc newVulkanRenderPass*(device: VkDevice, swapchainFormat: VkFormat): VulkanRe
   new(result)
   result.device = device
 
-  # 1. Color Attachment Description
+# 1. Color Attachment Description
   var colorAttachment: VkAttachmentDescription
-  colorAttachment.format = swapchainFormat
-  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT
+  colorAttachment.format = swapchainFormat # e.g., VK_FORMAT_B8G8R8A8_SRGB
+  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT # MUST MATCH multisampling.rasterizationSamples!
   colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR
   colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE
   colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE
@@ -30,15 +30,16 @@ proc newVulkanRenderPass*(device: VkDevice, swapchainFormat: VkFormat): VulkanRe
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS
   subpass.colorAttachmentCount = 1
   subpass.pColorAttachments = addr colorAttachmentRef
+  subpass.pDepthStencilAttachment = nil # Explicitly nil since we have no depth buffer yet
 
   # 4. Subpass Dependency
   var dependency: VkSubpassDependency
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL
   dependency.dstSubpass = 0
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.VkPipelineStageFlags
-  dependency.srcAccessMask = VkAccessFlags(0)
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.VkPipelineStageFlags
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.VkAccessFlags
+  dependency.srcStageMask = cast[VkPipelineStageFlags](VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.uint32)
+  dependency.srcAccessMask = cast[VkAccessFlags](0'u32)
+  dependency.dstStageMask = cast[VkPipelineStageFlags](VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.uint32)
+  dependency.dstAccessMask = cast[VkAccessFlags](VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.uint32)
 
   # 5. Create Render Pass
   var renderPassInfo: VkRenderPassCreateInfo
@@ -50,8 +51,11 @@ proc newVulkanRenderPass*(device: VkDevice, swapchainFormat: VkFormat): VulkanRe
   renderPassInfo.dependencyCount = 1
   renderPassInfo.pDependencies = addr dependency
 
-  if vkCreateRenderPass(device, addr renderPassInfo, nil, addr result.renderPass) != VK_SUCCESS:
-    raise newException(Exception, "Failed to create Vulkan Render Pass!")
+  var renderPass: VkRenderPass
+  if vkCreateRenderPass(device, addr renderPassInfo, nil, addr renderPass) != VK_SUCCESS:
+    raise newException(Exception, "Failed to create Render Pass!")
+  result.renderPass = renderPass
+
 
 proc cleanup*(rp: VulkanRenderPass) =
   if rp != nil and cast[pointer](rp.device) != nil and cast[uint64](rp.renderPass) != 0:

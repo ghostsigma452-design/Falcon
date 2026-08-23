@@ -1,9 +1,23 @@
-// triangle.vert
+// shader.vert
 #version 450
-vec2 positions[3] = vec2[](vec2(0.0, -0.5), vec2(0.5, 0.5), vec2(-0.5, 0.5));
-vec3 colors[3] = vec3[](vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0));
-layout(location = 0) out vec3 fragColor;
+
+struct GPUVertex {
+    vec4 position;
+    vec4 color;
+};
+
+struct GPUSceneData {
+    mat4 viewProj;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
+    GPUVertex vertices[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer SceneBuffer {
+    GPUSceneData sceneData;
+};
+
 void main() {
-    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
-    fragColor = colors[gl_VertexIndex];
+    // ...
 }

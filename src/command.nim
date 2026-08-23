@@ -1,7 +1,9 @@
-# src/commands.nim
+# command.nim
 import vk14
+import vkLoader
 import swapchain
 import pipeline
+import descriptors
 
 type
   VulkanRenderer* = ref object
@@ -14,15 +16,16 @@ type
     renderFinishedSemaphore*: VkSemaphore
     inFlightFence*: VkFence
 
-proc newVulkanRenderer*(device: VkDevice, graphicsFamily, presentFamily: uint32): VulkanRenderer =
+proc newVulkanRenderer*(instance: VkInstance, device: VkDevice, graphicsFamily, presentFamily: uint32): VulkanRenderer =
   new(result)
   result.device = device
 
-  # Fetch Queue Handles
+  # Call procedure loader directly from Vkloader
+  loadLogicalDeviceProcs(instance, device)
+
   vkGetDeviceQueue(device, graphicsFamily, 0, addr result.graphicsQueue)
   vkGetDeviceQueue(device, presentFamily, 0, addr result.presentQueue)
 
-  # 1. Create Command Pool
   var poolInfo: VkCommandPoolCreateInfo
   poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT.VkCommandPoolCreateFlags
@@ -31,7 +34,6 @@ proc newVulkanRenderer*(device: VkDevice, graphicsFamily, presentFamily: uint32)
   if vkCreateCommandPool(device, addr poolInfo, nil, addr result.commandPool) != VK_SUCCESS:
     raise newException(Exception, "Failed to create Command Pool!")
 
-  # 2. Allocate Command Buffer
   var allocInfo: VkCommandBufferAllocateInfo
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO
   allocInfo.commandPool = result.commandPool
@@ -41,7 +43,6 @@ proc newVulkanRenderer*(device: VkDevice, graphicsFamily, presentFamily: uint32)
   if vkAllocateCommandBuffers(device, addr allocInfo, addr result.commandBuffer) != VK_SUCCESS:
     raise newException(Exception, "Failed to allocate Command Buffer!")
 
-  # 3. Create Sync Objects
   var semaphoreInfo: VkSemaphoreCreateInfo
   semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
 
@@ -54,90 +55,80 @@ proc newVulkanRenderer*(device: VkDevice, graphicsFamily, presentFamily: uint32)
      vkCreateFence(device, addr fenceInfo, nil, addr result.inFlightFence) != VK_SUCCESS:
     raise newException(Exception, "Failed to create Synchronization Primitives!")
 
-proc recordCommandBuffer(
+proc recordCommandBuffer*(
     cb: VkCommandBuffer,
     renderPass: VkRenderPass,
     framebuffer: VkFramebuffer,
     extent: VkExtent2D,
-    pipeline: VkPipeline
+    pipeline: VulkanPipeline,
+    ssboPack: SSBOPack,
+    vertexCount: uint32
 ) =
+  # Handle validation guards
+  if vkCmdBeginRenderPass == nil:
+    raise newException(Exception, "vkCmdBeginRenderPass pointer is NIL! Check Vkloader proc loading.")
+  if cast[uint64](renderPass) == 0:
+    raise newException(Exception, "renderPass handle is null!")
+  if cast[uint64](framebuffer) == 0:
+    raise newException(Exception, "framebuffer handle is null!")
+
   var beginInfo: VkCommandBufferBeginInfo
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
 
   if vkBeginCommandBuffer(cb, addr beginInfo) != VK_SUCCESS:
-    raise newException(Exception, "Failed to begin recording Command Buffer!")
+    raise newException(Exception, "Failed to begin command buffer recording!")
 
-  var clearColor = VkClearValue(
-    color: VkClearColorValue(float32: [0.0f, 0.0f, 0.0f, 1.0f])
-  )
+  var clearColor = VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f]))
 
   var renderPassInfo: VkRenderPassBeginInfo
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
   renderPassInfo.renderPass = renderPass
   renderPassInfo.framebuffer = framebuffer
-  renderPassInfo.renderArea.offset = VkOffset2D(x: 0, y: 0)
   renderPassInfo.renderArea.extent = extent
   renderPassInfo.clearValueCount = 1
   renderPassInfo.pClearValues = addr clearColor
 
   vkCmdBeginRenderPass(cb, addr renderPassInfo, VK_SUBPASS_CONTENTS_INLINE)
 
-  # Bind Dynamic State Viewport & Scissor
-  var viewport: VkViewport
-  viewport.x = 0.0f
-  viewport.y = 0.0f
-  viewport.width = extent.width.float32
-  viewport.height = extent.height.float32
-  viewport.minDepth = 0.0f
-  viewport.maxDepth = 1.0f
+  var viewport = VkViewport(x: 0, y: 0, width: extent.width.float32, height: extent.height.float32, minDepth: 0, maxDepth: 1)
+  var scissor = VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent)
   vkCmdSetViewport(cb, 0, 1, addr viewport)
-
-  var scissor: VkRect2D
-  scissor.offset = VkOffset2D(x: 0, y: 0)
-  scissor.extent = extent
   vkCmdSetScissor(cb, 0, 1, addr scissor)
 
-  # Bind Pipeline and Issue Draw Command
-  vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline)
-  vkCmdDraw(cb, 3, 1, 0, 0) # 3 vertices, 1 instance
+  vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline)
+
+  # Bind SSBO Descriptor Set
+  var ds = ssboPack.descriptorSet
+  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, addr ds, 0, nil)
+
+  vkCmdDraw(cb, vertexCount, 1, 0, 0)
 
   vkCmdEndRenderPass(cb)
-
   if vkEndCommandBuffer(cb) != VK_SUCCESS:
-    raise newException(Exception, "Failed to record Command Buffer!")
+    raise newException(Exception, "Failed to end command buffer recording!")
 
 proc drawFrame*(
     r: VulkanRenderer,
     sc: VulkanSwapchain,
     renderPass: VkRenderPass,
-    pipeline: VulkanPipeline
+    pipeline: VulkanPipeline,
+    ssboPack: SSBOPack,
+    vertexCount: uint32
 ) =
-  # Wait for prior frame execution
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
 
-  # 1. Acquire Image from Swapchain
   var imageIndex: uint32 = 0
-  discard vkAcquireNextImageKHR(
-    r.device,
-    sc.swapchain,
-    uint64.high,
-    r.imageAvailableSemaphore,
-    cast[VkFence](0),
-    addr imageIndex
-  )
+  let res = vkAcquireNextImageKHR(r.device, sc.swapchain, uint64.high, r.imageAvailableSemaphore, cast[VkFence](0), addr imageIndex)
+  if res != VK_SUCCESS and res != VK_SUBOPTIMAL_KHR:
+    raise newException(Exception, "Failed to acquire next swapchain image! Code: " & $res)
 
-  # 2. Record Draw Commands
+  if imageIndex >= sc.framebuffers.len.uint32:
+    raise newException(Exception, "imageIndex out of bounds for framebuffers array.")
+
   discard vkResetCommandBuffer(r.commandBuffer, cast[VkCommandBufferResetFlags](0))
-  recordCommandBuffer(
-    r.commandBuffer,
-    renderPass,
-    sc.framebuffers[imageIndex],
-    sc.extent,
-    pipeline.pipeline
-  )
+  recordCommandBuffer(r.commandBuffer, renderPass, sc.framebuffers[imageIndex], sc.extent, pipeline, ssboPack, vertexCount)
 
-  # 3. Submit Commands to Graphics Queue
   var waitSemaphores = [r.imageAvailableSemaphore]
   var waitStages = [VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.VkPipelineStageFlags]
   var signalSemaphores = [r.renderFinishedSemaphore]
@@ -153,9 +144,8 @@ proc drawFrame*(
   submitInfo.pSignalSemaphores = addr signalSemaphores[0]
 
   if vkQueueSubmit(r.graphicsQueue, 1, addr submitInfo, r.inFlightFence) != VK_SUCCESS:
-    raise newException(Exception, "Failed to submit draw Command Buffer!")
+    raise newException(Exception, "Failed to submit queue!")
 
-  # 4. Present Frame to Screen
   var swapchains = [sc.swapchain]
   var presentInfo: VkPresentInfoKHR
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR
@@ -168,19 +158,9 @@ proc drawFrame*(
   discard vkQueuePresentKHR(r.presentQueue, addr presentInfo)
 
 proc cleanup*(r: VulkanRenderer) =
-  if r == nil or cast[pointer](r.device) == nil:
-    return
-
+  if r == nil or cast[pointer](r.device) == nil: return
   discard vkDeviceWaitIdle(r.device)
-
-  if cast[uint64](r.imageAvailableSemaphore) != 0 and cast[pointer](vkDestroySemaphore) != nil:
-    vkDestroySemaphore(r.device, r.imageAvailableSemaphore, nil)
-
-  if cast[uint64](r.renderFinishedSemaphore) != 0 and cast[pointer](vkDestroySemaphore) != nil:
-    vkDestroySemaphore(r.device, r.renderFinishedSemaphore, nil)
-
-  if cast[uint64](r.inFlightFence) != 0 and cast[pointer](vkDestroyFence) != nil:
-    vkDestroyFence(r.device, r.inFlightFence, nil)
-
-  if cast[uint64](r.commandPool) != 0 and cast[pointer](vkDestroyCommandPool) != nil:
-    vkDestroyCommandPool(r.device, r.commandPool, nil)
+  if cast[uint64](r.imageAvailableSemaphore) != 0: vkDestroySemaphore(r.device, r.imageAvailableSemaphore, nil)
+  if cast[uint64](r.renderFinishedSemaphore) != 0: vkDestroySemaphore(r.device, r.renderFinishedSemaphore, nil)
+  if cast[uint64](r.inFlightFence) != 0: vkDestroyFence(r.device, r.inFlightFence, nil)
+  if cast[uint64](r.commandPool) != 0: vkDestroyCommandPool(r.device, r.commandPool, nil)
