@@ -66,6 +66,8 @@ proc newVulkanBuffer*(
   # 4. Bind Memory to Buffer
   discard vkBindBufferMemory(device, result.buffer, result.memory, 0)
 
+
+
 # Map data from host RAM to GPU buffer
 proc copyData*(buf: VulkanBuffer, data: pointer, size: VkDeviceSize) =
   var mapped: pointer

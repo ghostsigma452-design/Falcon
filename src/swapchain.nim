@@ -123,6 +123,8 @@ proc newVulkanSwapchain*(
 
     if vkCreateImageView(device, addr viewInfo, nil, addr result.imageViews[i]) != VK_SUCCESS:
       raise newException(Exception, "Failed to create Swapchain Image View!")
+  
+
 
 proc createFramebuffers*(sc: VulkanSwapchain, renderPass: VkRenderPass) =
   sc.framebuffers = newSeq[VkFramebuffer](sc.imageViews.len)

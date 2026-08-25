@@ -28,12 +28,11 @@ proc rotateY(angle: float32): Mat4 =
 
 var win = newVulkanWindow("Falcon Engine - SSBO Cube", 1000, 1000)
 
-loadPhysicalDeviceProcs(win.vkInstance)
-let (physicalDevice, queueIndices) = pickPhysicalDevice(win.vkInstance, win.vkSurface)
-let dev = newVulkanDevice(win.vkInstance, physicalDevice, queueIndices)
-loadLogicalDeviceProcs(win.vkInstance, dev.logicalDevice)
+var ctx = initVk(win)
+let dev = ctx.device
+let physicalDevice = ctx.physicalDevice
 
-let swapchain = newVulkanSwapchain(physicalDevice, dev.logicalDevice, win.vkSurface, queueIndices, 1000, 1000)
+var swapchain = newSwapchain(ctx, 1000, 1000)
 let renderPass = newVulkanRenderPass(dev.logicalDevice, swapchain.format)
 swapchain.createFramebuffers(renderPass.renderPass)
 
@@ -114,7 +113,7 @@ let sceneSSBO = newVulkanBuffer(
 # 2. Setup Descriptors and Pipeline
 let ssboPack = newSSBOPack(dev.logicalDevice, vertexSSBO, sceneSSBO)
 let pipeline = newVulkanPipeline(dev.logicalDevice, renderPass.renderPass, swapchain.extent, ssboPack.layout, "shaders/vert.spv", "shaders/frag.spv")
-let renderer = newVulkanRenderer(win.vkInstance,dev.logicalDevice, queueIndices.graphicsFamily.uint32, queueIndices.presentFamily.uint32)
+let renderer = newVulkanRenderer(win.vkInstance,dev.logicalDevice, ctx.queueIndices.graphicsFamily.uint32, ctx.queueIndices.presentFamily.uint32)
 
 echo "Falcon Engine initialised successfully! Rendering SSBO 3D Cube..."
 
@@ -155,5 +154,4 @@ vertexSSBO.cleanup()
 sceneSSBO.cleanup()
 swapchain.cleanup()
 renderPass.cleanup()
-dev.cleanup()
 win.cleanup()
