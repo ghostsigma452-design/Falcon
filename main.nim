@@ -28,13 +28,13 @@ proc rotateY(angle: float32): Mat4 =
 
 var win = newVulkanWindow("Falcon Engine - SSBO Cube", 1000, 1000)
 
-var ctx = initVk(win)
+var ctx = newVk(win)
+ctx.initVk()
 let dev = ctx.device
 let physicalDevice = ctx.physicalDevice
+var renderpass = ctx.renderPass
+var swapchain = ctx.swapchain
 
-var swapchain = newSwapchain(ctx, 1000, 1000)
-let renderPass = newVulkanRenderPass(dev.logicalDevice, swapchain.format)
-swapchain.createFramebuffers(renderPass.renderPass)
 
 # 3D Cube Vertices (36 indices forming 12 triangles)
 let cubeVertices: array[36, GPUVertex] = [
@@ -136,10 +136,10 @@ while running:
   if cast[uint64](renderPass) == 0:
     raise newException(Exception, "renderPass handle is null!")
 
-  # Checks the Nim ref pointer
+
   echo "Nim Ref Object exists: ", renderPass != nil 
 
-# Checks the actual Vulkan handle (likely 0!)
+
   echo "Raw VkRenderPass handle: ", cast[uint64](renderPass.renderPass)
 
 

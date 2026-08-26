@@ -7,8 +7,10 @@ type
         physicalDevice*: VkPhysicalDevice
         queueIndices*: QueueFamilyIndices
         device*: VulkanDevice
+        swapchain*: VulkanSwapchain
+        renderPass*: VulkanRenderPass
 
-proc initVk*(win: VulkanWindow): vulkanContext =
+proc newVk*(win: VulkanWindow): vulkanContext =
     new(result)
 
     let instance = win.vkInstance
@@ -26,9 +28,17 @@ proc initVk*(win: VulkanWindow): vulkanContext =
 proc newSwapchain*(ctx: vulkanContext, width: int, height: int): VulkanSwapchain =
   return newVulkanSwapchain(ctx.physicalDevice, ctx.device.logicalDevice, ctx.surface, ctx.queueIndices, width, height)
 
+proc initVk*(ctx: var vulkanContext) =
+    var swapchain = newSwapchain(ctx, 1000, 1000)
+    let renderPass = newVulkanRenderPass(ctx.device.logicalDevice, swapchain.format)
+    swapchain.createFramebuffers(renderPass.renderPass)
+
+    ctx.swapchain = swapchain
+    ctx.renderPass = renderPass
 
 
-proc destroy(ctx: vulkanContext) =
+
+proc destroy*(ctx: vulkanContext) =
 
     ctx.device.cleanup()
 
