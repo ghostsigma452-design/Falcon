@@ -174,6 +174,11 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkQueueSubmit)
   loadDevProc(device, vkQueueWaitIdle)
 
+  # Vertex & Index Binding
+  loadDevProc(device, vkCmdBindVertexBuffers)
+  loadDevProc(device, vkCmdBindIndexBuffer)
+  loadDevProc(device, vkCmdDrawIndexed)
+
 # Load procedures required for physical and logical device creation
 proc loadDeviceCreationProcs*(instance: VkInstance) =
   loadInstProc(instance, vkEnumeratePhysicalDevices)

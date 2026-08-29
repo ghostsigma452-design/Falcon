@@ -6,6 +6,13 @@ import pipeline
 import descriptors
 
 type
+  RenderModel* = object
+    vertexBuffer*: VkBuffer
+    indexBuffer*: VkBuffer
+    indexCount*: uint32
+    ssboPack*: SSBOPack
+
+type
   VulkanRenderer* = ref object
     device*: VkDevice
     graphicsQueue*: VkQueue
@@ -15,6 +22,7 @@ type
     imageAvailableSemaphore*: VkSemaphore
     renderFinishedSemaphore*: VkSemaphore
     inFlightFence*: VkFence
+
 
 proc newVulkanRenderer*(instance: VkInstance, device: VkDevice, graphicsFamily, presentFamily: uint32): VulkanRenderer =
   new(result)
@@ -61,16 +69,10 @@ proc recordCommandBuffer*(
     framebuffer: VkFramebuffer,
     extent: VkExtent2D,
     pipeline: VulkanPipeline,
-    ssboPack: SSBOPack,
-    vertexCount: uint32
+    models: openArray[RenderModel]
 ) =
-  # Handle validation guards
   if vkCmdBeginRenderPass == nil:
-    raise newException(Exception, "vkCmdBeginRenderPass pointer is NIL! Check Vkloader proc loading.")
-  if cast[uint64](renderPass) == 0:
-    raise newException(Exception, "renderPass handle is null!")
-  if cast[uint64](framebuffer) == 0:
-    raise newException(Exception, "framebuffer handle is null!")
+    raise newException(Exception, "vkCmdBeginRenderPass pointer is NIL!")
 
   var beginInfo: VkCommandBufferBeginInfo
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
@@ -78,15 +80,18 @@ proc recordCommandBuffer*(
   if vkBeginCommandBuffer(cb, addr beginInfo) != VK_SUCCESS:
     raise newException(Exception, "Failed to begin command buffer recording!")
 
-  var clearColor = VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f]))
+  var clearValues = [
+    VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f])),
+    VkClearValue(depthStencil: VkClearDepthStencilValue(depth: 1.0f, stencil: 0))
+  ]
 
   var renderPassInfo: VkRenderPassBeginInfo
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
   renderPassInfo.renderPass = renderPass
   renderPassInfo.framebuffer = framebuffer
   renderPassInfo.renderArea.extent = extent
-  renderPassInfo.clearValueCount = 1
-  renderPassInfo.pClearValues = addr clearColor
+  renderPassInfo.clearValueCount = clearValues.len.uint32
+  renderPassInfo.pClearValues = addr clearValues[0]
 
   vkCmdBeginRenderPass(cb, addr renderPassInfo, VK_SUBPASS_CONTENTS_INLINE)
 
@@ -95,13 +100,26 @@ proc recordCommandBuffer*(
   vkCmdSetViewport(cb, 0, 1, addr viewport)
   vkCmdSetScissor(cb, 0, 1, addr scissor)
 
+  # Bind the pipeline once for all models sharing this pipeline
   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline)
 
-  # Bind SSBO Descriptor Set
-  var ds = ssboPack.descriptorSet
-  vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, addr ds, 0, nil)
+  # Loop through each unique model
+  for model in models:
+    # 1. Bind unique Vertex Buffer
+    var offset: VkDeviceSize = 0
+    var vbuf = model.vertexBuffer
 
-  vkCmdDraw(cb, vertexCount, 1, 0, 0)
+
+    vkCmdBindVertexBuffers(cb, 0, 1, addr vbuf, addr offset)
+    # 2. Bind unique Index Buffer
+    vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
+
+    # 3. Bind unique SSBO / Descriptor Set (for position/rotation matrices)
+    var ds = model.ssboPack.descriptorSet
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, addr ds, 0, nil)
+
+    # 4. Draw indexed geometry
+    vkCmdDrawIndexed(cb, model.indexCount, 1, 0, 0, 0)
 
   vkCmdEndRenderPass(cb)
   if vkEndCommandBuffer(cb) != VK_SUCCESS:
@@ -112,8 +130,7 @@ proc drawFrame*(
     sc: VulkanSwapchain,
     renderPass: VkRenderPass,
     pipeline: VulkanPipeline,
-    ssboPack: SSBOPack,
-    vertexCount: uint32
+    models: openArray[RenderModel]
 ) =
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
@@ -123,11 +140,8 @@ proc drawFrame*(
   if res != VK_SUCCESS and res != VK_SUBOPTIMAL_KHR:
     raise newException(Exception, "Failed to acquire next swapchain image! Code: " & $res)
 
-  if imageIndex >= sc.framebuffers.len.uint32:
-    raise newException(Exception, "imageIndex out of bounds for framebuffers array.")
-
   discard vkResetCommandBuffer(r.commandBuffer, cast[VkCommandBufferResetFlags](0))
-  recordCommandBuffer(r.commandBuffer, renderPass, sc.framebuffers[imageIndex], sc.extent, pipeline, ssboPack, vertexCount)
+  recordCommandBuffer(r.commandBuffer, renderPass, sc.framebuffers[imageIndex], sc.extent, pipeline, models)
 
   var waitSemaphores = [r.imageAvailableSemaphore]
   var waitStages = [VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.VkPipelineStageFlags]
