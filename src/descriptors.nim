@@ -11,32 +11,13 @@ type
 
 proc newSSBOPack*(
     device: VkDevice,
+    layout: VkDescriptorSetLayout,
     vertexBuffer: VulkanBuffer,
     sceneBuffer: VulkanBuffer
 ): SSBOPack =
   new(result)
   result.device = device
-
-  # 1. Define Layout Bindings (Binding 0 = Vertices, Binding 1 = Scene Matrix)
-  var bindings: array[2, VkDescriptorSetLayoutBinding]
-
-  bindings[0].binding = 0
-  bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-  bindings[0].descriptorCount = 1
-  bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT.VkShaderStageFlags
-
-  bindings[1].binding = 1
-  bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-  bindings[1].descriptorCount = 1
-  bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT.VkShaderStageFlags
-
-  var layoutInfo: VkDescriptorSetLayoutCreateInfo
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-  layoutInfo.bindingCount = bindings.len.uint32
-  layoutInfo.pBindings = addr bindings[0]
-
-  if vkCreateDescriptorSetLayout(device, addr layoutInfo, nil, addr result.layout) != VK_SUCCESS:
-    raise newException(Exception, "Failed to create Descriptor Set Layout!")
+  result.layout = layout
 
   # 2. Create Descriptor Pool
   var poolSize: VkDescriptorPoolSize

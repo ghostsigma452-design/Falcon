@@ -4,13 +4,80 @@ import vkLoader
 import swapchain
 import pipeline
 import descriptors
+import buffer
+import device
+import math
+import fmath
+
+
 
 type
   RenderModel* = object
     vertexBuffer*: VkBuffer
     indexBuffer*: VkBuffer
     indexCount*: uint32
+    sceneSSBO*: VulkanBuffer
     ssboPack*: SSBOPack
+
+  GPUSceneData = object
+    mvp: Mat4
+
+proc newRenderModel*[V, I](
+  physicalDevice: VkPhysicalDevice,
+  dev: VulkanDevice,
+  layout: VkDescriptorSetLayout,
+  vertices: openArray[V],
+  indices: openArray[I],
+  memoryFlags: VkMemoryPropertyFlags
+): RenderModel =
+  # 1. Create and populate Vertex Buffer
+  let vertexSize = (sizeof(V) * vertices.len).VkDeviceSize
+  let vertexSSBO = newVulkanBuffer(
+    physicalDevice,
+    dev.logicalDevice,
+    vertexSize,
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.VkBufferUsageFlags,
+    memoryFlags
+  )
+  if vertices.len > 0:
+    vertexSSBO.copyData(unsafeAddr vertices[0], vertexSize)
+
+  # 2. Create and populate Index Buffer
+  let indexSize = (sizeof(I) * indices.len).VkDeviceSize
+  let indexSSBO = newVulkanBuffer(
+    physicalDevice,
+    dev.logicalDevice,
+    indexSize,
+    VK_BUFFER_USAGE_INDEX_BUFFER_BIT.VkBufferUsageFlags,
+    memoryFlags
+  )
+  if indices.len > 0:
+    indexSSBO.copyData(unsafeAddr indices[0], indexSize)
+
+  # 3. Create Scene SSBO Buffer (for MVP matrix transforms)
+  let sceneSSBO = newVulkanBuffer(
+    physicalDevice,
+    dev.logicalDevice,
+    sizeof(GPUSceneData).VkDeviceSize,
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.VkBufferUsageFlags,
+    memoryFlags
+  )
+
+  # 4. Create SSBO Pack / Descriptor Set
+  let ssboPack = newSSBOPack(dev.logicalDevice, layout, vertexSSBO, sceneSSBO)
+
+  # 5. Construct RenderModel with raw VkBuffer handles
+  result = RenderModel(
+    vertexBuffer: vertexSSBO.buffer,
+    indexBuffer: indexSSBO.buffer,
+    indexCount: indices.len.uint32,
+    sceneSSBO: sceneSSBO,
+    ssboPack: ssboPack
+  )
+
+proc cleanup*(model: RenderModel) =
+  model.sceneSSBO.cleanup()
+  model.ssboPack.cleanup()
 
 type
   VulkanRenderer* = ref object
