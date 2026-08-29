@@ -1,2 +1,6 @@
 glslc shaders/basic.vert -o shaders/vert.spv
 glslc shaders/basic.frag -o shaders/frag.spv
+
+nim c main.nim
+
+nim c -d:danger -d:strip --mm:orc --opt:speed main.nim
