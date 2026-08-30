@@ -1,7 +1,7 @@
 # Falcon
 
-> A 2D/3D game engine written in **Nim**, built on **Vulkan 1.4** via [vk14](https://github.com/treeform/vk14), with **SDL2** for windowing and input.
-wef
+> A 3D game engine written in **Nim**, built on **Vulkan 1.4** via [vk14](https://github.com/treeform/vk14), with **SDL2** for windowing and input.
+
 [![Nim](https://img.shields.io/badge/Nim-2.0-blue)](https://nim-lang.org)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.4-green)](https://vulkan.lunarg.com)
 [![Status](https://img.shields.io/badge/status-WIP-orange)]()
@@ -18,3 +18,13 @@ small, readable, and fast.
 - [Nim](https://nim-lang.org) 2.0+
 - [Vulkan 1.4]
 - **SDL2** development libraries
+
+## Getting Started
+
+```sh
+git clone https://github.com/ghostsigma452-design/Falcon
+cd Falcon
+
+nimble install vk14
+nimble install sdl2
+nim c main.nim
