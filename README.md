@@ -25,6 +25,15 @@ small, readable, and fast.
 git clone https://github.com/ghostsigma452-design/Falcon
 cd Falcon
 
+glslc shaders/basic.vert -o shaders/vert.spv
+glslc shaders/basic.frag -o shaders/frag.spv
+
 nimble install vk14
 nimble install sdl2
 nim c main.nim
+
+```
+## For Production
+
+``` sh
+nim c -d:release -d:strip --mm:orc --opt:speed main.nim   
