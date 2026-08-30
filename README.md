@@ -11,7 +11,7 @@
 and **SDL2** for window creation, input, and event handling. The core stays
 small, readable, and fast.
 
-> ⚠️ Under active development — APIs are unstable.
+> ⚠️ Under active development — Not reccomended for use yet.
 
 ## Requirements
 
