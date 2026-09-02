@@ -11,34 +11,7 @@ type
   GPUSceneData = object
     mvp: Mat4
 
-# Matrix Multiplication (4x4) to combine Translation * Rotation
-proc `*`(a, b: Mat4): Mat4 =
-  for r in 0..3:
-    for c in 0..3:
-      var sum = 0.0f
-      for k in 0..3:
-        sum += a[r * 4 + k] * b[k * 4 + c]
-      result[r * 4 + c] = sum
 
-# Translation Matrix
-proc translate(x, y, z: float32): Mat4 =
-  result = [
-    1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f,
-       x,    y,    z, 1.0f
-  ]
-
-# Rotation Matrix around Y axis
-proc rotateY(angle: float32): Mat4 =
-  let c = cos(angle)
-  let s = sin(angle)
-  result = [
-     c,    0.0f,  s,    0.0f,
-     0.0f, 1.0f,  0.0f, 0.0f,
-    -s,    0.0f,  c,    0.0f,
-     0.0f, 0.0f,  0.0f, 1.0f
-  ]
 
 # Initialize Window & Context
 var win = newVulkanWindow("Falcon Engine - 2 Render Objects", 1000, 1000)
