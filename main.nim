@@ -62,7 +62,7 @@ while running:
       running = false
 
 
-  angle += 0.005f
+  angle += 0.00005f
 
   # 1. Create Projection Matrix (45 degree FOV)
   var proj, view, viewProj: Mat4
@@ -93,8 +93,7 @@ while running:
   var sceneData2 = GPUSceneData(mvp: mvp2)
   cube2.mesh.sceneSSBO.copyData(addr sceneData2, sizeof(GPUSceneData).VkDeviceSize)
 
-  # 5. Render both models
-  renderer.drawFrame(ctx.swapchain, ctx.renderPass.renderPass, pipeline, [cube1.mesh, cube2.mesh])
+
 
 
   # Render both models in a single draw pass
