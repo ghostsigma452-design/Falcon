@@ -73,7 +73,7 @@ proc createPipeline*(
     ctx.device.logicalDevice,
     ctx.renderPass.renderPass,
     ctx.swapchain.extent,
-    ctx.globalLayout, # or ctx.ssboPack.layout depending on your field name
+    ctx.globalLayout, 
     vertPath,
     fragPath
   )
