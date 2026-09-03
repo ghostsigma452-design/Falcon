@@ -1,6 +1,6 @@
-import src/[window, device, vkLoader, swapchain, renderpass, pipeline, command, buffer, descriptors, vulkanContext, helper]
+import src/[window, device, vkLoader, swapchain, renderpass, pipeline, command, buffer, descriptors, vulkanContext, helper, model]
 import vk14
 import sdl2
 import cglm
 
-export window, sdl2, vk14, device, vkLoader, swapchain, renderpass, pipeline, command, buffer, descriptors, vulkanContext, helper, cglm
+export window, sdl2, vk14, device, vkLoader, swapchain, renderpass, pipeline, command, buffer, descriptors, vulkanContext, helper, cglm, model

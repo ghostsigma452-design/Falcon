@@ -19,8 +19,8 @@ type
     sceneSSBO*: VulkanBuffer
     ssboPack*: SSBOPack
 
-  GPUSceneData = object
-    mvp: Mat4
+  GPUSceneData* = object
+    mvp*: Mat4
 
 proc newRenderModel*[V, I](
   physicalDevice: VkPhysicalDevice,

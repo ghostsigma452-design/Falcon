@@ -1,4 +1,6 @@
-import vk14
+import vk14, cglm
+
+proc vec3*(x, y, z: float32): Vec3 = [x, y, z]
 
 template getBufferSize*[T](t: typedesc[T], length: int = 1): VkDeviceSize =
   (sizeof(t) * length).VkDeviceSize
