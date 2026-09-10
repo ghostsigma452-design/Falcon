@@ -2,6 +2,15 @@ import vk14, cglm
 
 proc vec3*(x, y, z: float32): Vec3 = [x, y, z]
 
+proc `+`*(a, b: Vec3): Vec3 =
+  result = [a[0] + b[0], a[1] + b[1], a[2] + b[2]]   
+
+proc `-`*(a, b: Vec3): Vec3 =
+  result = [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+
+proc `*`*(a: Vec3, s: float32): Vec3 =
+  result = [a[0] * s, a[1] * s, a[2] * s]   
+
 template getBufferSize*[T](t: typedesc[T], length: int = 1): VkDeviceSize =
   (sizeof(t) * length).VkDeviceSize
 

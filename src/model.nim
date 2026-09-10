@@ -1,32 +1,10 @@
-import command, cglm, vulkanContext, helper
+import command, cglm, vulkanContext, helper, entity, transform
 
 type
-  transform* = object 
-    pos*: Vec3
-    rot*: Vec3    
-    scale*: Vec3
-
-  component* = object 
-    transform*: transform
-
-  entity* = ref object of RootObj
-    components*: seq[component]
 
   model* = ref object of entity
     mesh*: RenderModel
 
-
-
-
-
-proc getModelMatrix*(t: transform): Mat4 =
-  glm_mat4_identity(result)
-  glm_translate(result, t.pos)
-  glm_rotate(result, t.rot[0], [1.0'f32, 0.0'f32, 0.0'f32])
-  glm_rotate(result, t.rot[1], [0.0'f32, 1.0'f32, 0.0'f32])
-  glm_rotate(result, t.rot[2], [0.0'f32, 0.0'f32, 1.0'f32])
-  glm_scale(result, t.scale)
-  return result
 
 proc spawnModel*[V, I](
     ctx: vulkanContext,
@@ -48,8 +26,9 @@ proc spawnModel*[V, I](
   )
 
   result.components = @[
-    component(transform: transform(pos: pos, rot: rot, scale: scale))
+    component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
+
 
 proc cleanup*(m: model) =
     m.mesh.cleanup()
