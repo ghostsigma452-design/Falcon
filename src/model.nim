@@ -1,4 +1,4 @@
-import command, cglm, vulkanContext, helper, entity, transform
+import command, cglm, entity, transform, buffer, vk14
 
 type
 
@@ -6,28 +6,15 @@ type
     mesh*: RenderModel
 
 
-proc spawnModel*[V, I](
-    ctx: vulkanContext,
-    vertices: openArray[V],
-    indices: openArray[I],
-    pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
-    rot: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
-    scale: Vec3 = [1.0'f32, 1.0'f32, 1.0'f32]
-): model =
-  new(result)
 
-  result.mesh = newRenderModel(
-    ctx.physicalDevice,
-    ctx.device,
-    ctx.globalLayout,
-    vertices,
-    indices,
-    getMemFlags()
-  )
 
-  result.components = @[
-    component(transform: Transform(pos: pos, rot: rot, scale: scale))
-  ]
+proc updateMVP*(m: var model, viewProj: Mat4) =
+  var mvp: Mat4
+  var modelMat = m.transform.getModelMatrix()
+  glm_mat4_mul(viewProj, modelMat, mvp)
+  
+  var sceneData = GPUSceneData(mvp: mvp)
+  m.mesh.sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
 
 
 proc cleanup*(m: model) =

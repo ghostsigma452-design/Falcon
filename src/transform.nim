@@ -37,7 +37,16 @@ proc movez*(t: var Transform, v: float)=
   t.setPos(vec3(0f, 0f, v) + t.pos)
 
 proc rotate*(t: var Transform, v: Vec3)=
-  t.setRot(v + t.pos)
+  t.setRot(v + t.rot)
+
+proc rotateX*(t: var Transform, v: float)=
+  t.setRot(vec3(v, 0f, 0f) + t.rot)
+
+proc rotateY*(t: var Transform, v: float)=
+  t.setRot(vec3(0f, v, 0f) + t.rot)
+
+proc rotateZ*(t: var Transform, v: float)=
+  t.setRot(vec3(0f, 0f, v) + t.rot)
 
 proc scale*(t: var Transform, v: Vec3)=
   t.setScale(v + t.scale)

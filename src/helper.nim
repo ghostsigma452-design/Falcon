@@ -19,3 +19,6 @@ template getMemFlags*(): VkMemoryPropertyFlags =
     uint32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) or 
     uint32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
   )
+
+proc speed*(f: float, delta: float = 1): float =
+  result = f * 0.001f * delta

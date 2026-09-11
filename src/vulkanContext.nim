@@ -1,4 +1,4 @@
-import command, device, renderpass, swapchain, vkLoader, vk14, window, pipeline
+import command, device, renderpass, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform
 
 type
     vulkanContext* = ref object 
@@ -90,7 +90,32 @@ proc initVk*(ctx: var vulkanContext) =
 
     ctx.globalLayout = createGlobalDescriptorLayout(ctx.device.logicalDevice)
 
+proc spawnModel*[V, I](
+    ctx: vulkanContext,
+    vertices: openArray[V],
+    indices: openArray[I],
+    pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
+    rot: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
+    scale: Vec3 = [1.0'f32, 1.0'f32, 1.0'f32]
+): model =
+  new(result)
 
+  result.mesh = newRenderModel(
+    ctx.physicalDevice,
+    ctx.device,
+    ctx.globalLayout,
+    vertices,
+    indices,
+    getMemFlags()
+  )
+
+  result.components = @[
+    component(transform: Transform(pos: pos, rot: rot, scale: scale))
+  ]
+
+
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, models: openArray[RenderModel]) =
+  drawFrame(ctx.renderer, ctx.swapchain, ctx.renderPass.renderPass, pipeline, models)
 
 proc destroy*(ctx: vulkanContext) =
   ctx.renderer.cleanup()
