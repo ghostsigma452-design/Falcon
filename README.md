@@ -9,7 +9,7 @@
 **Falcon** is a work-in-progress game engine that uses
 [**vk14**](https://github.com/treeform/vk14) as its Vulkan 1.4 rendering backend
 and **SDL2** for window creation, input, and event handling. The core stays
-small, readable, and fast.
+small, readable, and fast. The example code is in main.nim
 
 > ⚠️ Under active development — Not reccomended for use yet.
 
