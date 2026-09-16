@@ -8,6 +8,7 @@ import buffer
 import device
 import math
 import cglm
+import pushConstant
 
 
 
@@ -18,6 +19,7 @@ type
     indexCount*: uint32
     sceneSSBO*: VulkanBuffer
     ssboPack*: SSBOPack
+    matrix*: Mat4 # Store model matrix for push constants
 
   GPUSceneData* = object
     mvp*: Mat4
@@ -36,7 +38,10 @@ proc newRenderModel*[V, I](
     physicalDevice,
     dev.logicalDevice,
     vertexSize,
-    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.VkBufferUsageFlags,
+    cast[VkBufferUsageFlags](
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.uint32 or 
+      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT.uint32
+    ),
     memoryFlags
   )
   if vertices.len > 0:
@@ -54,7 +59,7 @@ proc newRenderModel*[V, I](
   if indices.len > 0:
     indexSSBO.copyData(unsafeAddr indices[0], indexSize)
 
-  # 3. Create Scene SSBO Buffer (for MVP matrix transforms)
+  # 3. Create Scene SSBO Buffer
   let sceneSSBO = newVulkanBuffer(
     physicalDevice,
     dev.logicalDevice,
@@ -66,15 +71,18 @@ proc newRenderModel*[V, I](
   # 4. Create SSBO Pack / Descriptor Set
   let ssboPack = newSSBOPack(dev.logicalDevice, layout, vertexSSBO, sceneSSBO)
 
-  # 5. Construct RenderModel with raw VkBuffer handles
+# 5. Construct RenderModel
+  var modelMatrix: Mat4
+  glm_mat4_identity(modelMatrix) # Mutates modelMatrix into an identity matrix
+
   result = RenderModel(
     vertexBuffer: vertexSSBO.buffer,
     indexBuffer: indexSSBO.buffer,
     indexCount: indices.len.uint32,
     sceneSSBO: sceneSSBO,
-    ssboPack: ssboPack
+    ssboPack: ssboPack,
+    matrix: modelMatrix # Pass initialized matrix
   )
-
 proc cleanup*(model: RenderModel) =
   model.sceneSSBO.cleanup()
   model.ssboPack.cleanup()
@@ -136,29 +144,25 @@ proc recordCommandBuffer*(
     framebuffer: VkFramebuffer,
     extent: VkExtent2D,
     pipeline: VulkanPipeline,
-    models: openArray[RenderModel]
+    models: openArray[RenderModel],
+    viewProj: Mat4
 ) =
-  if vkCmdBeginRenderPass == nil:
-    raise newException(Exception, "vkCmdBeginRenderPass pointer is NIL!")
-
-  var beginInfo: VkCommandBufferBeginInfo
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
-
-  if vkBeginCommandBuffer(cb, addr beginInfo) != VK_SUCCESS:
-    raise newException(Exception, "Failed to begin command buffer recording!")
+  var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
+  discard vkBeginCommandBuffer(cb, addr beginInfo)
 
   var clearValues = [
     VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f])),
     VkClearValue(depthStencil: VkClearDepthStencilValue(depth: 1.0f, stencil: 0))
   ]
 
-  var renderPassInfo: VkRenderPassBeginInfo
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO
-  renderPassInfo.renderPass = renderPass
-  renderPassInfo.framebuffer = framebuffer
-  renderPassInfo.renderArea.extent = extent
-  renderPassInfo.clearValueCount = clearValues.len.uint32
-  renderPassInfo.pClearValues = addr clearValues[0]
+  var renderPassInfo = VkRenderPassBeginInfo(
+    sType: VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+    renderPass: renderPass,
+    framebuffer: framebuffer,
+    renderArea: VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent),
+    clearValueCount: clearValues.len.uint32,
+    pClearValues: addr clearValues[0]
+  )
 
   vkCmdBeginRenderPass(cb, addr renderPassInfo, VK_SUBPASS_CONTENTS_INLINE)
 
@@ -167,37 +171,50 @@ proc recordCommandBuffer*(
   vkCmdSetViewport(cb, 0, 1, addr viewport)
   vkCmdSetScissor(cb, 0, 1, addr scissor)
 
-  # Bind the pipeline once for all models sharing this pipeline
   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline)
 
-  # Loop through each unique model
+  var pcBlock = initPushConstantBlock()
+
   for model in models:
-    # 1. Bind unique Vertex Buffer
+    if model.indexCount == 0: continue
+
+    # 1. Bind SSBO Descriptor Set (Set 0)
+    var descriptorSet = model.ssboPack.descriptorSet # Ensure field matches your SSBOPack definition
+    vkCmdBindDescriptorSets(
+      cb,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      pipeline.layout,
+      0'u32,
+      1'u32,
+      addr descriptorSet,
+      0,
+      nil
+    )
+
+    # 2. Bind Vertex & Index Buffers
     var offset: VkDeviceSize = 0
     var vbuf = model.vertexBuffer
-
-
     vkCmdBindVertexBuffers(cb, 0, 1, addr vbuf, addr offset)
-    # 2. Bind unique Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-    # 3. Bind unique SSBO / Descriptor Set (for position/rotation matrices)
-    var ds = model.ssboPack.descriptorSet
-    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, 1, addr ds, 0, nil)
+    # 3. Push Constants
+    pcBlock.clear()
+    pcBlock.pushWrite(viewProj)
+    pcBlock.pushWrite(model.matrix)
+    pcBlock.flush(cb, pipeline.layout, VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT))
 
-    # 4. Draw indexed geometry
+    # 4. Draw Call
     vkCmdDrawIndexed(cb, model.indexCount, 1, 0, 0, 0)
 
   vkCmdEndRenderPass(cb)
-  if vkEndCommandBuffer(cb) != VK_SUCCESS:
-    raise newException(Exception, "Failed to end command buffer recording!")
-
+  discard vkEndCommandBuffer(cb)
 proc drawFrame*(
     r: VulkanRenderer,
     sc: VulkanSwapchain,
     renderPass: VkRenderPass,
     pipeline: VulkanPipeline,
-    models: openArray[RenderModel]
+    models: openArray[RenderModel],
+    viewProj: Mat4 # Added missing parameter
 ) =
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
@@ -208,7 +225,17 @@ proc drawFrame*(
     raise newException(Exception, "Failed to acquire next swapchain image! Code: " & $res)
 
   discard vkResetCommandBuffer(r.commandBuffer, cast[VkCommandBufferResetFlags](0))
-  recordCommandBuffer(r.commandBuffer, renderPass, sc.framebuffers[imageIndex], sc.extent, pipeline, models)
+
+  # Pass viewProj to recordCommandBuffer call
+  recordCommandBuffer(
+    r.commandBuffer,
+    renderPass,
+    sc.framebuffers[imageIndex],
+    sc.extent,
+    pipeline,
+    models,
+    viewProj
+  )
 
   var waitSemaphores = [r.imageAvailableSemaphore]
   var waitStages = [VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT.VkPipelineStageFlags]

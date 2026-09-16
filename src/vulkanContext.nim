@@ -59,21 +59,29 @@ proc createPipeline*(
     vertPath, fragPath: string,
     extraLayouts: openArray[VkDescriptorSetLayout] = []
 ): VulkanPipeline =
-  # Combine globalLayout (Set 0) with any custom material/shader layouts (Set 1, Set 2...)
   var allLayouts = @[ctx.globalLayout]
   for l in extraLayouts:
     allLayouts.add(l)
 
-  var pipelineLayoutInfo: VkPipelineLayoutCreateInfo
-  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-  pipelineLayoutInfo.setLayoutCount = allLayouts.len.uint32
-  pipelineLayoutInfo.pSetLayouts = addr allLayouts[0]
+  var pushRange = VkPushConstantRange(
+    stageFlags: VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT),
+    offset: 0'u32,
+    size: 128'u32
+  )
+
+  var pipelineLayoutInfo = VkPipelineLayoutCreateInfo(
+    sType: VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    setLayoutCount: allLayouts.len.uint32,
+    pSetLayouts: if allLayouts.len > 0: addr allLayouts[0] else: nil,
+    pushConstantRangeCount: 1'u32,
+    pPushConstantRanges: addr pushRange
+  )
 
   return newVulkanPipeline(
     ctx.device.logicalDevice,
     ctx.renderPass.renderPass,
     ctx.swapchain.extent,
-    ctx.globalLayout, 
+    pipelineLayoutInfo,
     vertPath,
     fragPath
   )
@@ -114,8 +122,8 @@ proc spawnModel*[V, I](
   ]
 
 
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, models: openArray[RenderModel]) =
-  drawFrame(ctx.renderer, ctx.swapchain, ctx.renderPass.renderPass, pipeline, models)
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4,models: openArray[RenderModel]) =
+  drawFrame(ctx.renderer, ctx.swapchain, ctx.renderPass.renderPass, pipeline, models, viewProj)
 
 proc destroy*(ctx: vulkanContext) =
   ctx.renderer.cleanup()

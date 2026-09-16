@@ -29,11 +29,15 @@ proc newVulkanPipeline*(
     device: VkDevice,
     renderPass: VkRenderPass,
     extent: VkExtent2D,
-    descriptorSetLayout: VkDescriptorSetLayout,
+    layoutInfo: VkPipelineLayoutCreateInfo, # Updated type
     vertPath, fragPath: string
 ): VulkanPipeline =
   new(result)
+
   result.device = device
+  var mutLayoutInfo = layoutInfo
+  if vkCreatePipelineLayout(device, addr mutLayoutInfo, nil, addr result.layout) != VK_SUCCESS:
+    raise newException(Exception, "Failed to create pipeline layout!")
 
   let vertCode = readShaderFile(vertPath)
   let fragCode = readShaderFile(fragPath)
@@ -104,14 +108,7 @@ proc newVulkanPipeline*(
   dynamicState.dynamicStateCount = dynamicStates.len.uint32
   dynamicState.pDynamicStates = addr dynamicStates[0]
 
-  var dsLayout = descriptorSetLayout
-  var pipelineLayoutInfo: VkPipelineLayoutCreateInfo
-  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
-  pipelineLayoutInfo.setLayoutCount = 1
-  pipelineLayoutInfo.pSetLayouts = addr dsLayout
 
-  if vkCreatePipelineLayout(device, addr pipelineLayoutInfo, nil, addr result.layout) != VK_SUCCESS:
-    raise newException(Exception, "Failed to create Pipeline Layout!")
 
   var pipelineInfo: VkGraphicsPipelineCreateInfo
   pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO

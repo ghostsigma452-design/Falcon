@@ -69,8 +69,7 @@ while running:
   cube2.updateMVP(viewProj)
 
   # Draw Frame
-  ctx.drawFrame(pipeline, [cube1.mesh, cube2.mesh])
-
+  ctx.drawFrame(pipeline, viewProj,[cube1.mesh, cube2.mesh])
 
 # Cleanup
 pipeline.cleanup()

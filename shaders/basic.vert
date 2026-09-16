@@ -1,32 +1,21 @@
 #version 450
 
-struct GPUVertex {
-    vec4 position;
-    vec4 color;
-};
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec4 inColor;
 
-struct GPUSceneData {
+layout(location = 0) out vec4 fragColor;
+
+// Global Frame Data (Set 0, Binding 0)
+layout(set = 0, binding = 0) uniform GlobalUBO {
     mat4 viewProj;
-};
+} ubo;
 
-layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
-    GPUVertex vertices[];
-};
-
-layout(std430, set = 0, binding = 1) readonly buffer SceneBuffer {
-    GPUSceneData sceneData;
-};
-
-// Output to fragment shader
-layout(location = 0) out vec3 fragColor;
+// Per-Object Instance Data (64 Bytes)
+layout(push_constant) uniform PushBlock {
+    mat4 model;
+} push;
 
 void main() {
-    // 1. Pull the vertex using Vulkan's built-in index variable
-    GPUVertex v = vertices[gl_VertexIndex]; 
-    
-    // 2. Apply MVP matrix
-    gl_Position = sceneData.viewProj * v.position; 
-    
-    // 3. Send color to fragment shader
-    fragColor = v.color.xyz;
+    gl_Position = ubo.viewProj * push.model * vec4(inPosition, 1.0);
+    fragColor = inColor;
 }

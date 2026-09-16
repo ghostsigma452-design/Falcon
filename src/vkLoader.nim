@@ -118,6 +118,7 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkCmdSetViewport)
   loadDevProc(device, vkCmdSetScissor)
   loadDevProc(device, vkCmdDraw)
+  loadDevProc(device, vkCmdDrawIndexed)
 
   # Swapchain & Image Views
   loadDevProc(device, vkCreateSwapchainKHR)
@@ -178,6 +179,8 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkCmdBindVertexBuffers)
   loadDevProc(device, vkCmdBindIndexBuffer)
   loadDevProc(device, vkCmdDrawIndexed)
+
+  loadDevProc(device, vkCmdPushConstants)
 
 # Load procedures required for physical and logical device creation
 proc loadDeviceCreationProcs*(instance: VkInstance) =
