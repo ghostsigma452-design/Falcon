@@ -178,8 +178,8 @@ proc recordCommandBuffer*(
   for model in models:
     if model.indexCount == 0: continue
 
-    # 1. Bind SSBO Descriptor Set (Set 0)
-    var descriptorSet = model.ssboPack.descriptorSet # Ensure field matches your SSBOPack definition
+  # 1. Bind SSBO Descriptor Set (Set 0)
+    var descriptorSet = model.ssboPack.descriptorSet
     vkCmdBindDescriptorSets(
       cb,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -191,19 +191,15 @@ proc recordCommandBuffer*(
       nil
     )
 
-    # 2. Bind Vertex & Index Buffers
-    var offset: VkDeviceSize = 0
-    var vbuf = model.vertexBuffer
-    vkCmdBindVertexBuffers(cb, 0, 1, addr vbuf, addr offset)
+  # 2. Bind Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-    # 3. Push Constants
+  # 3. Push Model Matrix (64 bytes)
     pcBlock.clear()
-    pcBlock.pushWrite(viewProj)
     pcBlock.pushWrite(model.matrix)
     pcBlock.flush(cb, pipeline.layout, VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT))
 
-    # 4. Draw Call
+  # 4. Draw Call
     vkCmdDrawIndexed(cb, model.indexCount, 1, 0, 0, 0)
 
   vkCmdEndRenderPass(cb)

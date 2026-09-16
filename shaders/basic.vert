@@ -1,21 +1,35 @@
 #version 450
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec4 inColor;
+struct GPUVertex {
+    vec4 position;
+    vec4 color;
+};
 
-layout(location = 0) out vec4 fragColor;
-
-// Global Frame Data (Set 0, Binding 0)
-layout(set = 0, binding = 0) uniform GlobalUBO {
+struct GPUSceneData {
     mat4 viewProj;
-} ubo;
+};
 
-// Per-Object Instance Data (64 Bytes)
+// Set 0, Binding 0: Vertex SSBO
+layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
+    GPUVertex vertices[];
+};
+
+// Set 0, Binding 1: Scene SSBO (View & Projection)
+layout(std430, set = 0, binding = 1) readonly buffer SceneBuffer {
+    GPUSceneData sceneData;
+};
+
+// Push Constant: Per-Object Model Matrix (64 bytes)
 layout(push_constant) uniform PushBlock {
     mat4 model;
 } push;
 
+layout(location = 0) out vec4 fragColor;
+
 void main() {
-    gl_Position = ubo.viewProj * push.model * vec4(inPosition, 1.0);
-    fragColor = inColor;
+    GPUVertex v = vertices[gl_VertexIndex];
+
+    // MVP multiplication performed in GLSL using push.model
+    gl_Position = sceneData.viewProj * push.model * v.position;
+    fragColor = v.color;
 }

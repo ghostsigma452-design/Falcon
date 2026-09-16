@@ -5,17 +5,17 @@ type
   model* = ref object of entity
     mesh*: RenderModel
 
-
-
+type
+  GPUSceneData* = object
+    viewProj*: Mat4
 
 proc updateMVP*(m: var model, viewProj: Mat4) =
-  var mvp: Mat4
-  var modelMat = m.transform.getModelMatrix()
-  glm_mat4_mul(viewProj, modelMat, mvp)
-  
-  var sceneData = GPUSceneData(mvp: mvp)
+  # Update and store model matrix on mesh
+  m.mesh.matrix = m.transform.getModelMatrix()
+
+  # Copy viewProj to SSBO
+  var sceneData = GPUSceneData(viewProj: viewProj)
   m.mesh.sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
 
-
 proc cleanup*(m: model) =
-    m.mesh.cleanup()
+  m.cleanup()
