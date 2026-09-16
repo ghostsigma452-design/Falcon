@@ -18,4 +18,4 @@ proc updateMVP*(m: var model, viewProj: Mat4) =
   m.mesh.sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
 
 proc cleanup*(m: model) =
-  m.cleanup()
+  m.mesh.cleanup()
