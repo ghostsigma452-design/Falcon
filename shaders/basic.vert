@@ -3,33 +3,35 @@
 struct GPUVertex {
     vec4 position;
     vec4 color;
+    vec4 normal;
 };
 
 struct GPUSceneData {
     mat4 viewProj;
 };
 
-// Set 0, Binding 0: Vertex SSBO
 layout(std430, set = 0, binding = 0) readonly buffer VertexBuffer {
     GPUVertex vertices[];
 };
 
-// Set 0, Binding 1: Scene SSBO (View & Projection)
 layout(std430, set = 0, binding = 1) readonly buffer SceneBuffer {
     GPUSceneData sceneData;
 };
 
-// Push Constant: Per-Object Model Matrix (64 bytes)
+// Reads model matrix starting at offset 0
 layout(push_constant) uniform PushBlock {
     mat4 model;
 } push;
 
-layout(location = 0) out vec4 fragColor;
+layout(location = 0) out vec3 fragWorldPos;
+layout(location = 1) out vec3 fragNormal;
 
 void main() {
     GPUVertex v = vertices[gl_VertexIndex];
-
-    // MVP multiplication performed in GLSL using push.model
-    gl_Position = sceneData.viewProj * push.model * v.position;
-    fragColor = v.color;
+    vec4 worldPos = push.model * vec4(v.position.xyz, 1.0);
+    
+    fragWorldPos = worldPos.xyz;
+    fragNormal = normalize(mat3(push.model) * v.normal.xyz);
+    
+    gl_Position = sceneData.viewProj * worldPos;
 }

@@ -197,6 +197,10 @@ proc recordCommandBuffer*(
   # 3. Push Model Matrix (64 bytes)
     pcBlock.clear()
     pcBlock.pushWrite(model.matrix)
+    pcBlock.pushWrite([0.8'f32, 0.2'f32, 0.2'f32]) # Albedo (RGB)
+    pcBlock.pushWrite(0.1'f32)                     # Metallic
+    pcBlock.pushWrite(0.4'f32)                     # Roughness
+    pcBlock.pushWrite(1.0'f32)
     pcBlock.flush(cb, pipeline.layout, VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT))
 
   # 4. Draw Call
