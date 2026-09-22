@@ -145,7 +145,8 @@ proc recordCommandBuffer*(
     extent: VkExtent2D,
     pipeline: VulkanPipeline,
     models: openArray[RenderModel],
-    viewProj: Mat4
+    viewProj: Mat4,
+    pushConstants: openArray[PushConstantValue] = DefaultPBRMaterial
 ) =
   var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
   discard vkBeginCommandBuffer(cb, addr beginInfo)
@@ -178,7 +179,7 @@ proc recordCommandBuffer*(
   for model in models:
     if model.indexCount == 0: continue
 
-  # 1. Bind SSBO Descriptor Set (Set 0)
+    # 1. Bind SSBO Descriptor Set (Set 0)
     var descriptorSet = model.ssboPack.descriptorSet
     vkCmdBindDescriptorSets(
       cb,
@@ -191,23 +192,35 @@ proc recordCommandBuffer*(
       nil
     )
 
-  # 2. Bind Index Buffer
+    # 2. Bind Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-  # 3. Push Model Matrix (64 bytes)
+    # 3. Write Push Constants (Model Matrix + Custom/Default List)
     pcBlock.clear()
-    pcBlock.pushWrite(model.matrix)
-    pcBlock.pushWrite([0.8'f32, 0.2'f32, 0.2'f32]) # Albedo (RGB)
-    pcBlock.pushWrite(0.1'f32)                     # Metallic
-    pcBlock.pushWrite(0.4'f32)                     # Roughness
-    pcBlock.pushWrite(1.0'f32)
-    pcBlock.flush(cb, pipeline.layout, VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT))
+    pcBlock.pushWrite(model.matrix) # Always write model matrix first (Offset 0..63)
 
-  # 4. Draw Call
+    for pc in pushConstants:
+      case pc.kind
+      of pckFloat:
+        pcBlock.pushWrite(pc.floatVal)
+      of pckVec3:
+        pcBlock.pushWrite(pc.vec3Val)
+      of pckMat4:
+        pcBlock.pushWrite(pc.mat4Val)
+
+    # Flush to both Vertex and Fragment stages
+    pcBlock.flush(
+      cb,
+      pipeline.layout,
+      VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT.uint32 or VK_SHADER_STAGE_FRAGMENT_BIT.uint32)
+    )
+
+    # 4. Draw Call
     vkCmdDrawIndexed(cb, model.indexCount, 1, 0, 0, 0)
 
   vkCmdEndRenderPass(cb)
   discard vkEndCommandBuffer(cb)
+
 proc drawFrame*(
     r: VulkanRenderer,
     sc: VulkanSwapchain,
