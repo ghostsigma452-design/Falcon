@@ -1,4 +1,3 @@
-# command.nim
 import vk14
 import vkLoader
 import swapchain
@@ -18,7 +17,7 @@ type
     indexCount*: uint32
     sceneSSBO*: VulkanBuffer
     ssboPack*: SSBOPack
-    matrix*: Mat4 # Store model matrix for push constants
+    matrix*: Mat4 # Model transformation matrix
 
   GPUSceneData* = object
     mvp*: Mat4
@@ -72,7 +71,7 @@ proc newRenderModel*[V, I](
 
   # 5. Construct RenderModel
   var modelMatrix: Mat4
-  glm_mat4_identity(modelMatrix) # Mutates modelMatrix into an identity matrix
+  glm_mat4_identity(modelMatrix)
 
   result = RenderModel(
     vertexBuffer: vertexSSBO.buffer,
@@ -80,7 +79,7 @@ proc newRenderModel*[V, I](
     indexCount: indices.len.uint32,
     sceneSSBO: sceneSSBO,
     ssboPack: ssboPack,
-    matrix: modelMatrix # Pass initialized matrix
+    matrix: modelMatrix
   )
 
 proc cleanup*(model: RenderModel) =
@@ -102,7 +101,6 @@ proc newVulkanRenderer*(instance: VkInstance, device: VkDevice, graphicsFamily, 
   new(result)
   result.device = device
 
-  # Call procedure loader directly from Vkloader
   loadLogicalDeviceProcs(instance, device)
 
   vkGetDeviceQueue(device, graphicsFamily, 0, addr result.graphicsQueue)
@@ -145,14 +143,13 @@ proc recordCommandBuffer*(
     pipeline: VulkanPipeline,
     models: openArray[RenderModel],
     viewProj: Mat4,
-    pushConstants: openArray[PushConstantValue] = DefaultPBRMaterial
+    cameraPos: Vec3,
+    pushConstants: openArray[PushConstantValue]
 ) =
-
-  
   var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
   discard vkBeginCommandBuffer(cb, addr beginInfo)
 
-  # 1. Color Attachment Configuration
+  # Color Attachment
   var colorAttachment = VkRenderingAttachmentInfo(
     sType: VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     imageView: swapchainImageView,
@@ -162,7 +159,7 @@ proc recordCommandBuffer*(
     clearValue: VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f]))
   )
 
-  # 2. Depth Attachment Configuration
+  # Depth Attachment
   var depthAttachment = VkRenderingAttachmentInfo(
     sType: VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
     imageView: depthResources.view,
@@ -172,7 +169,7 @@ proc recordCommandBuffer*(
     clearValue: VkClearValue(depthStencil: VkClearDepthStencilValue(depth: 1.0f, stencil: 0))
   )
 
-  # 3. Dynamic Rendering Info Setup
+  # Dynamic Rendering Info
   var renderingInfo = VkRenderingInfo(
     sType: VK_STRUCTURE_TYPE_RENDERING_INFO,
     renderArea: VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent),
@@ -196,6 +193,10 @@ proc recordCommandBuffer*(
   for model in models:
     if model.indexCount == 0: continue
 
+    # Upload ViewProjection to Model's Scene SSBO
+    var sceneData = GPUSceneData(mvp: viewProj)
+    model.sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
+
     # Bind SSBO Descriptor Set (Set 0)
     var descriptorSet = model.ssboPack.descriptorSet
     vkCmdBindDescriptorSets(
@@ -212,10 +213,12 @@ proc recordCommandBuffer*(
     # Bind Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-    # Write Push Constants (Model Matrix + Custom/Default List)
+    # Dynamic Push Constant Buffer Writing
     pcBlock.clear()
-    pcBlock.pushWrite(model.matrix) # Model matrix at Offset 0
+    pcBlock.pushWrite(model.matrix) # 64 bytes (Offset 0)
+    pcBlock.pushWrite(cameraPos)    # 12 bytes (Offset 64)
 
+    # Stream dynamic PBR push constants sequentially into pcBlock
     for pc in pushConstants:
       case pc.kind
       of pckFloat:
@@ -225,11 +228,11 @@ proc recordCommandBuffer*(
       of pckMat4:
         pcBlock.pushWrite(pc.mat4Val)
 
-    # Flush to Vertex and Fragment stages
+    # Flush packed byte array to GPU
     pcBlock.flush(
       cb,
       pipeline.layout,
-      VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT.uint32 or VK_SHADER_STAGE_FRAGMENT_BIT.uint32)
+      cast[VkShaderStageFlags](VK_SHADER_STAGE_VERTEX_BIT.uint32 or VK_SHADER_STAGE_FRAGMENT_BIT.uint32)
     )
 
     # Draw Call
@@ -244,7 +247,9 @@ proc drawFrame*(
     depthResources: DepthResources,
     pipeline: VulkanPipeline,
     models: openArray[RenderModel],
-    viewProj: Mat4
+    viewProj: Mat4,
+    cameraPos: Vec3,
+    pushConstants: openArray[PushConstantValue]
 ) =
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
@@ -256,7 +261,6 @@ proc drawFrame*(
 
   discard vkResetCommandBuffer(r.commandBuffer, cast[VkCommandBufferResetFlags](0))
 
-  # Record dynamic rendering commands
   recordCommandBuffer(
     r.commandBuffer,
     sc.imageViews[imageIndex],
@@ -264,7 +268,9 @@ proc drawFrame*(
     sc.extent,
     pipeline,
     models,
-    viewProj
+    viewProj,
+    cameraPos,
+    pushConstants
   )
 
   var waitSemaphores = [r.imageAvailableSemaphore]

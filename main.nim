@@ -103,7 +103,7 @@ while running:
   cube2.updateMVP(viewProj)
 
   # Draw Frame
-  ctx.drawFrame(pipeline, viewProj,[cube1.mesh, cube2.mesh])
+  ctx.drawFrame(pipeline, viewProj,[cube1.mesh, cube2.mesh], cam.transform.pos)
 
 # Cleanup
 pipeline.cleanup()
