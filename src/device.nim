@@ -14,9 +14,6 @@ type
 proc isComplete*(indices: QueueFamilyIndices): bool =
   indices.graphicsFamily != -1 and indices.presentFamily != -1
 
-
-
-
 proc findQueueFamilies*(device: VkPhysicalDevice, surface: VkSurfaceKHR): QueueFamilyIndices =
   var queueCount: uint32 = 0
   vkGetPhysicalDeviceQueueFamilyProperties(device, addr queueCount, nil)
@@ -62,7 +59,7 @@ proc newVulkanDevice*(
 ): VulkanDevice =
   new(result)
 
-  # 1. Deduplicate queue family indices (if graphics & present share the same family)
+  # 1. Deduplicate queue family indices
   var uniqueIndices: seq[uint32] = @[indices.graphicsFamily.uint32]
   if indices.presentFamily.uint32 notin uniqueIndices:
     uniqueIndices.add(indices.presentFamily.uint32)
@@ -78,19 +75,29 @@ proc newVulkanDevice*(
     queueCreateInfo.pQueuePriorities = addr queuePriority
     queueCreateInfos.add(queueCreateInfo)
 
-  # 2. Specify required device features and swapchain extensions
+  # 2. Specify required device features and extensions
   var deviceFeatures: VkPhysicalDeviceFeatures
-  var deviceExtensions = ["VK_KHR_swapchain"]
-  var extNames = [deviceExtensions[0].cstring]
 
-  # 3. Configure VkDeviceCreateInfo
+  # Dynamic Rendering Feature Enablement
+  var dynamicRenderingFeatures = VkPhysicalDeviceDynamicRenderingFeatures(
+    sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+    dynamicRendering: true.VkBool32
+  )
+
+  var extNames = [
+    cstring("VK_KHR_swapchain"),
+    cstring("VK_KHR_dynamic_rendering")
+  ]
+
+  # 3. Configure VkDeviceCreateInfo with pNext linked to dynamic rendering
   var createInfo: VkDeviceCreateInfo
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
+  createInfo.pNext = addr dynamicRenderingFeatures
   createInfo.queueCreateInfoCount = queueCreateInfos.len.uint32
   createInfo.pQueueCreateInfos = addr queueCreateInfos[0]
   createInfo.pEnabledFeatures = addr deviceFeatures
   createInfo.enabledExtensionCount = extNames.len.uint32
-  createInfo.ppEnabledExtensionNames = cast[cstringArray](addr extNames[0])
+  createInfo.ppEnabledExtensionNames = cast[cstringArray](addr extNames[0]) # Cast applied here
 
   # 4. Create the Logical Device
   if vkCreateDevice(physicalDevice, addr createInfo, nil, addr result.logicalDevice) != VK_SUCCESS:

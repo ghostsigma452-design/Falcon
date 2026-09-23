@@ -1,16 +1,16 @@
-import command, device, renderpass, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform
+import command, device, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform, depth
 
 type
-    vulkanContext* = ref object 
-        instance*: VkInstance
-        surface*: VkSurfaceKHR
-        physicalDevice*: VkPhysicalDevice
-        queueIndices*: QueueFamilyIndices
-        device*: VulkanDevice
-        swapchain*: VulkanSwapchain
-        renderPass*: VulkanRenderPass
-        renderer*: VulkanRenderer
-        globalLayout*: VkDescriptorSetLayout
+  vulkanContext* = ref object 
+    instance*: VkInstance
+    surface*: VkSurfaceKHR
+    physicalDevice*: VkPhysicalDevice
+    queueIndices*: QueueFamilyIndices
+    device*: VulkanDevice
+    swapchain*: VulkanSwapchain
+    depthResources*: DepthResources
+    renderer*: VulkanRenderer
+    globalLayout*: VkDescriptorSetLayout
 
 proc createGlobalDescriptorLayout(device: VkDevice): VkDescriptorSetLayout =
   var bindings: array[2, VkDescriptorSetLayoutBinding]
@@ -36,20 +36,19 @@ proc createGlobalDescriptorLayout(device: VkDevice): VkDescriptorSetLayout =
     raise newException(Exception, "Failed to create Global Descriptor Set Layout!")
 
 proc newVk*(win: VulkanWindow): vulkanContext =
-    new(result)
+  new(result)
 
-    let instance = win.vkInstance
-    let surface = win.vkSurface
-    loadPhysicalDeviceProcs(instance)
-    let (physicalDevice, queueIndices) = pickPhysicalDevice(instance, surface)
-    let dev = newVulkanDevice(instance, physicalDevice, queueIndices)
-    loadLogicalDeviceProcs(win.vkInstance, dev.logicalDevice)
-    result.instance = instance
-    result.surface = surface
-    result.physicalDevice = physicalDevice
-    result.queueIndices = queueIndices
-    result.device = dev
-    
+  let instance = win.vkInstance
+  let surface = win.vkSurface
+  loadPhysicalDeviceProcs(instance)
+  let (physicalDevice, queueIndices) = pickPhysicalDevice(instance, surface)
+  let dev = newVulkanDevice(instance, physicalDevice, queueIndices)
+  loadLogicalDeviceProcs(win.vkInstance, dev.logicalDevice)
+  result.instance = instance
+  result.surface = surface
+  result.physicalDevice = physicalDevice
+  result.queueIndices = queueIndices
+  result.device = dev
 
 proc newSwapchain*(ctx: vulkanContext, width: int, height: int): VulkanSwapchain =
   return newVulkanSwapchain(ctx.physicalDevice, ctx.device.logicalDevice, ctx.surface, ctx.queueIndices, width, height)
@@ -64,7 +63,7 @@ proc createPipeline*(
     allLayouts.add(l)
 
   var pushRange = VkPushConstantRange(
-    stageFlags: VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT),
+    stageFlags: VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT.uint32 or VK_SHADER_STAGE_FRAGMENT_BIT.uint32),
     offset: 0'u32,
     size: 128'u32
   )
@@ -79,24 +78,34 @@ proc createPipeline*(
 
   return newVulkanPipeline(
     ctx.device.logicalDevice,
-    ctx.renderPass.renderPass,
     ctx.swapchain.extent,
     pipelineLayoutInfo,
     vertPath,
-    fragPath
+    fragPath,
+    ctx.swapchain.format
   )
 
 proc initVk*(ctx: var vulkanContext) =
-    var swapchain = newSwapchain(ctx, 1000, 1000)
-    let renderPass = newVulkanRenderPass(ctx.device.logicalDevice, swapchain.format)
-    let renderer = newVulkanRenderer(ctx.instance, ctx.device.logicalDevice, ctx.queueIndices.graphicsFamily.uint32, ctx.queueIndices.presentFamily.uint32)
-    swapchain.createFramebuffers(renderPass.renderPass)
+  let swapchain = newSwapchain(ctx, 1000, 1000)
+  let renderer = newVulkanRenderer(
+    ctx.instance,
+    ctx.device.logicalDevice,
+    ctx.queueIndices.graphicsFamily.uint32,
+    ctx.queueIndices.presentFamily.uint32
+  )
 
-    ctx.swapchain = swapchain
-    ctx.renderPass = renderPass
-    ctx.renderer = renderer
+  # Create Depth Buffer Resources
+  let depthRes = createDepthResources(
+    ctx.physicalDevice,
+    ctx.device.logicalDevice,
+    swapchain.extent
+  )
 
-    ctx.globalLayout = createGlobalDescriptorLayout(ctx.device.logicalDevice)
+  ctx.swapchain = swapchain
+  ctx.depthResources = depthRes
+  ctx.renderer = renderer
+
+  ctx.globalLayout = createGlobalDescriptorLayout(ctx.device.logicalDevice)
 
 proc spawnModel*[V, I](
     ctx: vulkanContext,
@@ -121,14 +130,18 @@ proc spawnModel*[V, I](
     component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
 
-
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4,models: openArray[RenderModel]) =
-  drawFrame(ctx.renderer, ctx.swapchain, ctx.renderPass.renderPass, pipeline, models, viewProj)
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel]) =
+  drawFrame(
+    ctx.renderer,
+    ctx.swapchain,
+    ctx.depthResources,
+    pipeline,
+    models,
+    viewProj
+  )
 
 proc destroy*(ctx: vulkanContext) =
   ctx.renderer.cleanup()
-  ctx.renderPass.cleanup()
+  ctx.depthResources.cleanup(ctx.device.logicalDevice)
   ctx.swapchain.cleanup()
   ctx.device.cleanup()
-
-

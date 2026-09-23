@@ -111,29 +111,33 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkResetCommandBuffer)
   loadDevProc(device, vkCmdCopyBuffer)
 
-  # Drawing & RenderPass Commands
-  loadDevProc(device, vkCmdBeginRenderPass)
-  loadDevProc(device, vkCmdEndRenderPass)
+  # Dynamic Rendering Commands (with KHR fallback)
+  loadDevProc(device, vkCmdBeginRendering)
+  if vkCmdBeginRendering == nil:
+    vkCmdBeginRendering = cast[type(vkCmdBeginRendering)](getDeviceProcAddr(device, "vkCmdBeginRenderingKHR"))
+
+  loadDevProc(device, vkCmdEndRendering)
+  if vkCmdEndRendering == nil:
+    vkCmdEndRendering = cast[type(vkCmdEndRendering)](getDeviceProcAddr(device, "vkCmdEndRenderingKHR"))
+
   loadDevProc(device, vkCmdBindPipeline)
   loadDevProc(device, vkCmdSetViewport)
   loadDevProc(device, vkCmdSetScissor)
   loadDevProc(device, vkCmdDraw)
   loadDevProc(device, vkCmdDrawIndexed)
 
-  # Swapchain & Image Views
+  # Swapchain, Image Views, & Images
   loadDevProc(device, vkCreateSwapchainKHR)
   loadDevProc(device, vkDestroySwapchainKHR)
   loadDevProc(device, vkGetSwapchainImagesKHR)
   loadDevProc(device, vkAcquireNextImageKHR)
   loadDevProc(device, vkQueuePresentKHR)
+  loadDevProc(device, vkCreateImage)
+  loadDevProc(device, vkDestroyImage)
+  loadDevProc(device, vkGetImageMemoryRequirements)
+  loadDevProc(device, vkBindImageMemory)
   loadDevProc(device, vkCreateImageView)
   loadDevProc(device, vkDestroyImageView)
-
-  # Render Pass & Framebuffers
-  loadDevProc(device, vkCreateRenderPass)
-  loadDevProc(device, vkDestroyRenderPass)
-  loadDevProc(device, vkCreateFramebuffer)
-  loadDevProc(device, vkDestroyFramebuffer)
 
   # Shaders & Pipeline
   loadDevProc(device, vkCreateShaderModule)
@@ -161,7 +165,7 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkMapMemory)
   loadDevProc(device, vkUnmapMemory)
 
-  # Descriptor Sets (For SSBOs)
+  # Descriptor Sets
   loadDevProc(device, vkCreateDescriptorSetLayout)
   loadDevProc(device, vkDestroyDescriptorSetLayout)
   loadDevProc(device, vkCreateDescriptorPool)
@@ -170,7 +174,6 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   loadDevProc(device, vkUpdateDescriptorSets)
   loadDevProc(device, vkCmdBindDescriptorSets)
 
-
   # Queue Submission & Sync
   loadDevProc(device, vkQueueSubmit)
   loadDevProc(device, vkQueueWaitIdle)
@@ -178,10 +181,9 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   # Vertex & Index Binding
   loadDevProc(device, vkCmdBindVertexBuffers)
   loadDevProc(device, vkCmdBindIndexBuffer)
-  loadDevProc(device, vkCmdDrawIndexed)
 
+  # Push Constants
   loadDevProc(device, vkCmdPushConstants)
-
 # Load procedures required for physical and logical device creation
 proc loadDeviceCreationProcs*(instance: VkInstance) =
   loadInstProc(instance, vkEnumeratePhysicalDevices)

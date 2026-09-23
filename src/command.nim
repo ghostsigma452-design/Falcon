@@ -6,11 +6,10 @@ import pipeline
 import descriptors
 import buffer
 import device
+import depth
 import math
 import cglm
 import pushConstant
-
-
 
 type
   RenderModel* = object
@@ -71,7 +70,7 @@ proc newRenderModel*[V, I](
   # 4. Create SSBO Pack / Descriptor Set
   let ssboPack = newSSBOPack(dev.logicalDevice, layout, vertexSSBO, sceneSSBO)
 
-# 5. Construct RenderModel
+  # 5. Construct RenderModel
   var modelMatrix: Mat4
   glm_mat4_identity(modelMatrix) # Mutates modelMatrix into an identity matrix
 
@@ -83,6 +82,7 @@ proc newRenderModel*[V, I](
     ssboPack: ssboPack,
     matrix: modelMatrix # Pass initialized matrix
   )
+
 proc cleanup*(model: RenderModel) =
   model.sceneSSBO.cleanup()
   model.ssboPack.cleanup()
@@ -97,7 +97,6 @@ type
     imageAvailableSemaphore*: VkSemaphore
     renderFinishedSemaphore*: VkSemaphore
     inFlightFence*: VkFence
-
 
 proc newVulkanRenderer*(instance: VkInstance, device: VkDevice, graphicsFamily, presentFamily: uint32): VulkanRenderer =
   new(result)
@@ -140,32 +139,50 @@ proc newVulkanRenderer*(instance: VkInstance, device: VkDevice, graphicsFamily, 
 
 proc recordCommandBuffer*(
     cb: VkCommandBuffer,
-    renderPass: VkRenderPass,
-    framebuffer: VkFramebuffer,
+    swapchainImageView: VkImageView,
+    depthResources: DepthResources,
     extent: VkExtent2D,
     pipeline: VulkanPipeline,
     models: openArray[RenderModel],
     viewProj: Mat4,
     pushConstants: openArray[PushConstantValue] = DefaultPBRMaterial
 ) =
+
+  
   var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
   discard vkBeginCommandBuffer(cb, addr beginInfo)
 
-  var clearValues = [
-    VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f])),
-    VkClearValue(depthStencil: VkClearDepthStencilValue(depth: 1.0f, stencil: 0))
-  ]
-
-  var renderPassInfo = VkRenderPassBeginInfo(
-    sType: VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-    renderPass: renderPass,
-    framebuffer: framebuffer,
-    renderArea: VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent),
-    clearValueCount: clearValues.len.uint32,
-    pClearValues: addr clearValues[0]
+  # 1. Color Attachment Configuration
+  var colorAttachment = VkRenderingAttachmentInfo(
+    sType: VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    imageView: swapchainImageView,
+    imageLayout: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    loadOp: VK_ATTACHMENT_LOAD_OP_CLEAR,
+    storeOp: VK_ATTACHMENT_STORE_OP_STORE,
+    clearValue: VkClearValue(color: VkClearColorValue(float32: [0.05f, 0.05f, 0.05f, 1.0f]))
   )
 
-  vkCmdBeginRenderPass(cb, addr renderPassInfo, VK_SUBPASS_CONTENTS_INLINE)
+  # 2. Depth Attachment Configuration
+  var depthAttachment = VkRenderingAttachmentInfo(
+    sType: VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+    imageView: depthResources.view,
+    imageLayout: VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    loadOp: VK_ATTACHMENT_LOAD_OP_CLEAR,
+    storeOp: VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    clearValue: VkClearValue(depthStencil: VkClearDepthStencilValue(depth: 1.0f, stencil: 0))
+  )
+
+  # 3. Dynamic Rendering Info Setup
+  var renderingInfo = VkRenderingInfo(
+    sType: VK_STRUCTURE_TYPE_RENDERING_INFO,
+    renderArea: VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent),
+    layerCount: 1,
+    colorAttachmentCount: 1,
+    pColorAttachments: addr colorAttachment,
+    pDepthAttachment: addr depthAttachment
+  )
+
+  vkCmdBeginRendering(cb, addr renderingInfo)
 
   var viewport = VkViewport(x: 0, y: 0, width: extent.width.float32, height: extent.height.float32, minDepth: 0, maxDepth: 1)
   var scissor = VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: extent)
@@ -179,7 +196,7 @@ proc recordCommandBuffer*(
   for model in models:
     if model.indexCount == 0: continue
 
-    # 1. Bind SSBO Descriptor Set (Set 0)
+    # Bind SSBO Descriptor Set (Set 0)
     var descriptorSet = model.ssboPack.descriptorSet
     vkCmdBindDescriptorSets(
       cb,
@@ -192,12 +209,12 @@ proc recordCommandBuffer*(
       nil
     )
 
-    # 2. Bind Index Buffer
+    # Bind Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-    # 3. Write Push Constants (Model Matrix + Custom/Default List)
+    # Write Push Constants (Model Matrix + Custom/Default List)
     pcBlock.clear()
-    pcBlock.pushWrite(model.matrix) # Always write model matrix first (Offset 0..63)
+    pcBlock.pushWrite(model.matrix) # Model matrix at Offset 0
 
     for pc in pushConstants:
       case pc.kind
@@ -208,26 +225,26 @@ proc recordCommandBuffer*(
       of pckMat4:
         pcBlock.pushWrite(pc.mat4Val)
 
-    # Flush to both Vertex and Fragment stages
+    # Flush to Vertex and Fragment stages
     pcBlock.flush(
       cb,
       pipeline.layout,
       VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT.uint32 or VK_SHADER_STAGE_FRAGMENT_BIT.uint32)
     )
 
-    # 4. Draw Call
+    # Draw Call
     vkCmdDrawIndexed(cb, model.indexCount, 1, 0, 0, 0)
 
-  vkCmdEndRenderPass(cb)
+  vkCmdEndRendering(cb)
   discard vkEndCommandBuffer(cb)
 
 proc drawFrame*(
     r: VulkanRenderer,
     sc: VulkanSwapchain,
-    renderPass: VkRenderPass,
+    depthResources: DepthResources,
     pipeline: VulkanPipeline,
     models: openArray[RenderModel],
-    viewProj: Mat4 # Added missing parameter
+    viewProj: Mat4
 ) =
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
@@ -239,11 +256,11 @@ proc drawFrame*(
 
   discard vkResetCommandBuffer(r.commandBuffer, cast[VkCommandBufferResetFlags](0))
 
-  # Pass viewProj to recordCommandBuffer call
+  # Record dynamic rendering commands
   recordCommandBuffer(
     r.commandBuffer,
-    renderPass,
-    sc.framebuffers[imageIndex],
+    sc.imageViews[imageIndex],
+    depthResources,
     sc.extent,
     pipeline,
     models,
