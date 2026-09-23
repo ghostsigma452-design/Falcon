@@ -52,13 +52,20 @@ let cubeVertices*: seq[GPUVertex] = @[
   GPUVertex(pos: [ 0.3f, -0.3f,  0.3f, 1.0f], color: [0.2f, 1.0f, 0.2f, 1.0f], normal: [ 0.0f, -1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [-0.3f, -0.3f,  0.3f, 1.0f], color: [1.0f, 0.2f, 0.2f, 1.0f], normal: [ 0.0f, -1.0f,  0.0f, 0.0f])
 ]
-let cubeIndices: seq[uint32] = @[
-  0, 1, 2,  2, 3, 0,
-  5, 4, 7,  7, 6, 5,
-  4, 0, 3,  3, 7, 4,
-  1, 5, 6,  6, 2, 1,
-  3, 2, 6,  6, 7, 3,
-  4, 5, 1,  1, 0, 4
+
+let cubeIndices*: seq[uint32] = @[
+  # Front (+Z): vertices 0..3
+  0'u32, 1'u32, 2'u32,    2'u32, 3'u32, 0'u32,
+  # Back (-Z): vertices 4..7
+  4'u32, 5'u32, 6'u32,    6'u32, 7'u32, 4'u32,
+  # Right (+X): vertices 8..11
+  8'u32, 9'u32, 10'u32,   10'u32, 11'u32, 8'u32,
+  # Left (-X): vertices 12..15
+  12'u32, 13'u32, 14'u32, 14'u32, 15'u32, 12'u32,
+  # Top (+Y): vertices 16..19
+  16'u32, 17'u32, 18'u32, 18'u32, 19'u32, 16'u32,
+  # Bottom (-Y): vertices 20..23
+  20'u32, 21'u32, 22'u32, 22'u32, 23'u32, 20'u32
 ]
 
 # 2. Camera & Models Setup
