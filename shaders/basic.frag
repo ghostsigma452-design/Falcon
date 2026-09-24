@@ -49,8 +49,7 @@ void main() {
     vec3 V = normalize(push.cameraPos.xyz - fragWorldPos);
 
     // Use vertex color if present, otherwise default to 1.0
-    vec3 vColor = (length(fragColor.rgb) > 0.001) ? fragColor.rgb : vec3(1.0);
-    vec3 albedo = vColor * push.albedo.rgb;
+    vec3 albedo = push.albedo.rgb;
 
     float metallic  = clamp(push.metallic, 0.0, 1.0);
     float roughness = clamp(push.roughness, 0.05, 1.0);
@@ -78,7 +77,10 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
 
-    vec3 ambient = vec3(0.1) * albedo * ao;
+    vec3 R = reflect(-V, N); // Reflection vector
+    vec3 skyColor = mix(vec3(0.05, 0.05, 0.08), vec3(0.4, 0.6, 0.9), clamp(R.y * 0.5 + 0.5, 0.0, 1.0));
+
+    vec3 ambient = skyColor * albedo * ao;
     vec3 color = ambient + Lo;
 
     // Tone Mapping & Gamma Correction
