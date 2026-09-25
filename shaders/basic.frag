@@ -3,18 +3,19 @@
 // Inputs from Vertex Shader
 layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) in vec3 fragNormal;
-layout(location = 2) in vec4 fragColor;
 
 layout(location = 0) out vec4 outColor;
 
-// Push Constants (Must match vertex shader layout exactly)
+// Push Constants (Packed 100 bytes matching Nim's exact stream)
 layout(push_constant) uniform PBRPushBlock {
-    mat4 model;       // Offset 0
-    vec4 cameraPos;   // Offset 64
-    vec4 albedo;      // Offset 80
-    float metallic;   // Offset 96
-    float roughness;  // Offset 100
-    float ao;         // Offset 104
+    layout(offset = 0)  mat4 model;       // Offset 0   (64 bytes)
+    layout(offset = 64) vec3 cameraPos;   // Offset 64  (12 bytes)
+    layout(offset = 76) float albedoR;    // Offset 76  (4 bytes)
+    layout(offset = 80) float albedoG;    // Offset 80  (4 bytes)
+    layout(offset = 84) float albedoB;    // Offset 84  (4 bytes)
+    layout(offset = 88) float metallic;   // Offset 88  (4 bytes)
+    layout(offset = 92) float roughness;  // Offset 92  (4 bytes)
+    layout(offset = 96) float ao;         // Offset 96  (4 bytes)
 } push;
 
 const float PI = 3.14159265359;
@@ -46,10 +47,10 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 
 void main() {
     vec3 N = normalize(fragNormal);
-    vec3 V = normalize(push.cameraPos.xyz - fragWorldPos);
+    vec3 V = normalize(push.cameraPos - fragWorldPos);
 
-    // Use vertex color if present, otherwise default to 1.0
-    vec3 albedo = push.albedo.rgb;
+    // Reconstruct albedo vector from explicit float offsets
+    vec3 albedo = vec3(push.albedoR, push.albedoG, push.albedoB);
 
     float metallic  = clamp(push.metallic, 0.0, 1.0);
     float roughness = clamp(push.roughness, 0.05, 1.0);
@@ -71,16 +72,15 @@ void main() {
     float G   = GeometrySmith(N, V, L, roughness);      
     vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);
         
-    vec3 specular = (NDF * G * F) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001);
+    float NdotV = max(dot(N, V), 0.0001);
+    float NdotL = max(dot(N, L), 0.0001);
+    vec3 specular = (NDF * G * F) / (4.0 * NdotV * NdotL);
+
     vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);     
 
-    float NdotL = max(dot(N, L), 0.0);
     vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
 
-    vec3 R = reflect(-V, N); // Reflection vector
-    vec3 skyColor = mix(vec3(0.05, 0.05, 0.08), vec3(0.4, 0.6, 0.9), clamp(R.y * 0.5 + 0.5, 0.0, 1.0));
-
-    vec3 ambient = skyColor * albedo * ao;
+    vec3 ambient = vec3(0.03) * albedo * ao;
     vec3 color = ambient + Lo;
 
     // Tone Mapping & Gamma Correction

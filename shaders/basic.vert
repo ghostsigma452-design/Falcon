@@ -19,20 +19,21 @@ layout(std430, set = 0, binding = 1) readonly buffer SceneBuffer {
     GPUSceneData sceneData;
 };
 
-// Push Constants (112 bytes total)
+// Push Constants (Packed 100 bytes matching Nim's exact stream)
 layout(push_constant) uniform PBRPushBlock {
-    mat4 model;       // Offset 0   (64 bytes)
-    vec4 cameraPos;   // Offset 64  (16 bytes - use cameraPos.xyz)
-    vec4 albedo;      // Offset 80  (16 bytes - use albedo.rgb)
-    float metallic;   // Offset 96  (4 bytes)
-    float roughness;  // Offset 100 (4 bytes)
-    float ao;         // Offset 104 (4 bytes)
+    layout(offset = 0)  mat4 model;       // Offset 0   (64 bytes)
+    layout(offset = 64) vec3 cameraPos;   // Offset 64  (12 bytes)
+    layout(offset = 76) float albedoR;    // Offset 76  (4 bytes)
+    layout(offset = 80) float albedoG;    // Offset 80  (4 bytes)
+    layout(offset = 84) float albedoB;    // Offset 84  (4 bytes)
+    layout(offset = 88) float metallic;   // Offset 88  (4 bytes)
+    layout(offset = 92) float roughness;  // Offset 92  (4 bytes)
+    layout(offset = 96) float ao;         // Offset 96  (4 bytes)
 } push;
 
 // Outputs to Fragment Shader
 layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormal;
-layout(location = 2) out vec4 fragColor;
 
 void main() {
     GPUVertex v = vertices[gl_VertexIndex];
@@ -40,11 +41,8 @@ void main() {
     vec4 worldPos = push.model * vec4(v.position.xyz, 1.0);
     fragWorldPos = worldPos.xyz;
 
-    // Transform normal to world space
     mat3 normalMatrix = transpose(inverse(mat3(push.model)));
     fragNormal = normalize(normalMatrix * v.normal.xyz);
-
-    fragColor = v.color;
 
     gl_Position = sceneData.viewProj * worldPos;
 }

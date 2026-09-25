@@ -1,4 +1,4 @@
-import command, device, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform, depth, materials, pushConstant
+import command, device, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform, depth, materials
 
 type
   vulkanContext* = ref object 
@@ -130,7 +130,7 @@ proc spawnModel*[V, I](
     component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
 
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: openArray[PushConstantValue] = DefaultPBRMaterial) =
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = SilverPBR) =
   drawFrame(
     ctx.renderer,
     ctx.swapchain,
