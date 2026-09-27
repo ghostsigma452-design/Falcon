@@ -1,13 +1,7 @@
 import falcon, math
 
-
-
-# Initialize Window & Context
-var win = newVulkanWindow("Falcon Engine - 2 Render Objects", 1000, 1000)
-
-
-var ctx = newVk(win)
-ctx.initVk()
+# 1. Initialize Engine (manages Window, Vulkan Context, and Event Loop)
+var engine = newEngine("Falcon Engine - 2 Render Objects", 1000, 1000)
 
 type
   GPUVertex* = object
@@ -54,60 +48,54 @@ let cubeVertices*: seq[GPUVertex] = @[
 ]
 
 let cubeIndices*: seq[uint32] = @[
-  # Front (+Z): vertices 0..3
   0'u32, 1'u32, 2'u32,    2'u32, 3'u32, 0'u32,
-  # Back (-Z): vertices 4..7
   4'u32, 5'u32, 6'u32,    6'u32, 7'u32, 4'u32,
-  # Right (+X): vertices 8..11
   8'u32, 9'u32, 10'u32,   10'u32, 11'u32, 8'u32,
-  # Left (-X): vertices 12..15
   12'u32, 13'u32, 14'u32, 14'u32, 15'u32, 12'u32,
-  # Top (+Y): vertices 16..19
   16'u32, 17'u32, 18'u32, 18'u32, 19'u32, 16'u32,
-  # Bottom (-Y): vertices 20..23
   20'u32, 21'u32, 22'u32, 22'u32, 23'u32, 20'u32
 ]
 
 # 2. Camera & Models Setup
 var cam = newCamera()
 
-var cube1 = spawnModel(ctx, cubeVertices, cubeIndices)
+var cube1 = engine.spawnModel(
+  cubeVertices, 
+  cubeIndices, 
+  pos = [-0.6'f32, 0.0'f32, -2.5'f32]
+)
 
-
-var cube2 = spawnModel(ctx, cubeVertices, cubeIndices)
-
-
-cube1.transform.pos = [-0.6f, 0.0f, -2.5f]
-cube2.transform.pos = [ 0.6f, 0.0f, -2.5f]
+var cube2 = engine.spawnModel(
+  cubeVertices, 
+  cubeIndices, 
+  pos = [0.6'f32, 0.0'f32, -2.5'f32]
+)
 
 # 3. Pipeline Setup
-let pipeline = ctx.createPipeline("shaders/vert.spv", "shaders/frag.spv")
-
-
-var event: Event
-var running = true
+let mainPipeline = engine.ctx.createPipeline("shaders/vert.spv", "shaders/frag.spv")
+engine.addPipeline(mainPipeline) # Registers and sets as activePipeline
 
 # 4. Render Loop
-while running:
-  while pollEvent(event):
-    if event.kind == QuitEvent:
-      running = false
+while engine.running:
+  # Process Window & SDL Quit Events
+  engine.processEvents()
 
   let viewProj = cam.getViewProjectionMatrix()
 
-  # Rotations & SSBO updates
+  # Rotations & Model Updates
   cube1.transform.rotateX(speed(1))
   cube1.updateMVP(viewProj)
 
   cube2.transform.rotateX(speed(-1))
   cube2.updateMVP(viewProj)
 
-  # Draw Frame
-  ctx.drawFrame(pipeline, viewProj,[cube1.mesh, cube2.mesh], cam.transform.pos)
+  # Draw Frame using engine's active pipeline
+  engine.ctx.drawFrame(
+    engine.activePipeline, 
+    viewProj, 
+    [cube1.mesh, cube2.mesh], 
+    cam.transform.pos
+  )
 
-# Cleanup
-pipeline.cleanup()
-cube1.cleanup()
-cube2.cleanup()
-ctx.destroy()
-win.cleanup()
+# 5. Complete Teardown (Handles GPU idle wait, pipeline, model, context, and window cleanup)
+engine.destroy()
