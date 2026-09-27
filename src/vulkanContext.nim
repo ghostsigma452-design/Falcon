@@ -130,7 +130,7 @@ proc spawnModel*[V, I](
     component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
 
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = WoodPBR) =
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = RubberPBR) =
   drawFrame(
     ctx.renderer,
     ctx.swapchain,

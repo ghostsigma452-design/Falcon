@@ -43,7 +43,7 @@ const WoodPBR*: material = @[
 ]
 
 const PlasticPBR*: material = @[
-  PushConstantValue(kind: pckVec3,  vec3Val: [0.25'f32, 0.25'f32, 0.28'f32]), # Albedo (dark gray)
+  PushConstantValue(kind: pckVec3,  vec3Val: [0.05'f32, 0.05'f32, 0.08'f32]), # Albedo (dark gray)
   PushConstantValue(kind: pckFloat, floatVal: 0.0'f32),                       # Metallic
   PushConstantValue(kind: pckFloat, floatVal: 0.35'f32),                      # Roughness (semi-gloss)
   PushConstantValue(kind: pckFloat, floatVal: 1.0'f32)                        # AO
@@ -52,14 +52,14 @@ const PlasticPBR*: material = @[
 const ConcretePBR*: material = @[
   PushConstantValue(kind: pckVec3,  vec3Val: [0.5'f32, 0.5'f32, 0.48'f32]),   # Albedo (neutral gray)
   PushConstantValue(kind: pckFloat, floatVal: 0.0'f32),                       # Metallic
-  PushConstantValue(kind: pckFloat, floatVal: 0.9'f32),                       # Roughness (very rough)
+  PushConstantValue(kind: pckFloat, floatVal: 1'f32),                       # Roughness (very rough)
   PushConstantValue(kind: pckFloat, floatVal: 1.0'f32)                        # AO
 ]
 
 const RubberPBR*: material = @[
-  PushConstantValue(kind: pckVec3,  vec3Val: [0.1'f32, 0.1'f32, 0.1'f32]),    # Albedo (near-black)
+  PushConstantValue(kind: pckVec3,  vec3Val: [0.0'f32, 0.0'f32, 0.0'f32]),    # Albedo (near-black)
   PushConstantValue(kind: pckFloat, floatVal: 0.0'f32),                       # Metallic
-  PushConstantValue(kind: pckFloat, floatVal: 0.85'f32),                      # Roughness (very matte)
+  PushConstantValue(kind: pckFloat, floatVal: 0.1'f32),                      # Roughness (very matte)
   PushConstantValue(kind: pckFloat, floatVal: 1.0'f32)                        # AO
 ]
 
