@@ -1,7 +1,7 @@
-import falcon, math
+import falcon
 
-# 1. Initialize Engine (manages Window, Vulkan Context, and Event Loop)
-var engine = newEngine("Falcon Engine - 2 Render Objects", 1000, 1000)
+# 1. Initialize Engine
+var fg = newEngine("Falcon Engine - 2 Render Objects", 1000, 1000)
 
 type
   GPUVertex* = object
@@ -10,37 +10,37 @@ type
     normal*: array[4, float32]
 
 let cubeVertices*: seq[GPUVertex] = @[
-  # --- Front Face (+Z) ---
+  # Front Face (+Z)
   GPUVertex(pos: [-0.3f, -0.3f,  0.3f, 1.0f], color: [1.0f, 0.2f, 0.2f, 1.0f], normal: [ 0.0f,  0.0f,  1.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f, -0.3f,  0.3f, 1.0f], color: [0.2f, 1.0f, 0.2f, 1.0f], normal: [ 0.0f,  0.0f,  1.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f,  0.3f, 1.0f], color: [0.2f, 0.2f, 1.0f, 1.0f], normal: [ 0.0f,  0.0f,  1.0f, 0.0f]),
   GPUVertex(pos: [-0.3f,  0.3f,  0.3f, 1.0f], color: [1.0f, 1.0f, 0.2f, 1.0f], normal: [ 0.0f,  0.0f,  1.0f, 0.0f]),
 
-  # --- Back Face (-Z) ---
+  # Back Face (-Z)
   GPUVertex(pos: [ 0.3f, -0.3f, -0.3f, 1.0f], color: [1.0f, 0.2f, 1.0f, 1.0f], normal: [ 0.0f,  0.0f, -1.0f, 0.0f]),
   GPUVertex(pos: [-0.3f, -0.3f, -0.3f, 1.0f], color: [0.2f, 1.0f, 1.0f, 1.0f], normal: [ 0.0f,  0.0f, -1.0f, 0.0f]),
   GPUVertex(pos: [-0.3f,  0.3f, -0.3f, 1.0f], color: [0.1f, 0.1f, 0.1f, 1.0f], normal: [ 0.0f,  0.0f, -1.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f, -0.3f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f], normal: [ 0.0f,  0.0f, -1.0f, 0.0f]),
 
-  # --- Right Face (+X) ---
+  # Right Face (+X)
   GPUVertex(pos: [ 0.3f, -0.3f,  0.3f, 1.0f], color: [0.2f, 1.0f, 0.2f, 1.0f], normal: [ 1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f, -0.3f, -0.3f, 1.0f], color: [1.0f, 0.2f, 1.0f, 1.0f], normal: [ 1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f, -0.3f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f], normal: [ 1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f,  0.3f, 1.0f], color: [0.2f, 0.2f, 1.0f, 1.0f], normal: [ 1.0f,  0.0f,  0.0f, 0.0f]),
 
-  # --- Left Face (-X) ---
+  # Left Face (-X)
   GPUVertex(pos: [-0.3f, -0.3f, -0.3f, 1.0f], color: [0.2f, 1.0f, 1.0f, 1.0f], normal: [-1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [-0.3f, -0.3f,  0.3f, 1.0f], color: [1.0f, 0.2f, 0.2f, 1.0f], normal: [-1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [-0.3f,  0.3f,  0.3f, 1.0f], color: [1.0f, 1.0f, 0.2f, 1.0f], normal: [-1.0f,  0.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [-0.3f,  0.3f, -0.3f, 1.0f], color: [0.1f, 0.1f, 0.1f, 1.0f], normal: [-1.0f,  0.0f,  0.0f, 0.0f]),
 
-  # --- Top Face (+Y) ---
+  # Top Face (+Y)
   GPUVertex(pos: [-0.3f,  0.3f,  0.3f, 1.0f], color: [1.0f, 1.0f, 0.2f, 1.0f], normal: [ 0.0f,  1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f,  0.3f, 1.0f], color: [0.2f, 0.2f, 1.0f, 1.0f], normal: [ 0.0f,  1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f,  0.3f, -0.3f, 1.0f], color: [1.0f, 1.0f, 1.0f, 1.0f], normal: [ 0.0f,  1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [-0.3f,  0.3f, -0.3f, 1.0f], color: [0.1f, 0.1f, 0.1f, 1.0f], normal: [ 0.0f,  1.0f,  0.0f, 0.0f]),
 
-  # --- Bottom Face (-Y) ---
+  # Bottom Face (-Y)
   GPUVertex(pos: [-0.3f, -0.3f, -0.3f, 1.0f], color: [0.2f, 1.0f, 1.0f, 1.0f], normal: [ 0.0f, -1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f, -0.3f, -0.3f, 1.0f], color: [1.0f, 0.2f, 1.0f, 1.0f], normal: [ 0.0f, -1.0f,  0.0f, 0.0f]),
   GPUVertex(pos: [ 0.3f, -0.3f,  0.3f, 1.0f], color: [0.2f, 1.0f, 0.2f, 1.0f], normal: [ 0.0f, -1.0f,  0.0f, 0.0f]),
@@ -56,46 +56,38 @@ let cubeIndices*: seq[uint32] = @[
   20'u32, 21'u32, 22'u32, 22'u32, 23'u32, 20'u32
 ]
 
-# 2. Camera & Models Setup
+# 2. Setup Camera & Pipelines
 var cam = newCamera()
+let mainPipeline = fg.ctx.createPipeline("shaders/vert.spv", "shaders/frag.spv")
+fg.addPipeline(mainPipeline)
 
-var cube1 = engine.spawnModel(
+# 3. Spawn Distinct Models
+var cube1 = fg.spawnModel(
   cubeVertices, 
   cubeIndices, 
-  pos = [-0.6'f32, 0.0'f32, -2.5'f32]
+  pos = [-1.0'f32, 0.0'f32, -3.0'f32]
 )
 
-var cube2 = engine.spawnModel(
+var cube2 = fg.spawnModel(
   cubeVertices, 
   cubeIndices, 
-  pos = [0.6'f32, 0.0'f32, -2.5'f32]
+  pos = [1.0'f32, 0.0'f32, -3.0'f32]
 )
 
-# 3. Pipeline Setup
-let mainPipeline = engine.ctx.createPipeline("shaders/vert.spv", "shaders/frag.spv")
-engine.addPipeline(mainPipeline) # Registers and sets as activePipeline
 
 # 4. Render Loop
-while engine.running:
-  # Process Window & SDL Quit Events
-  engine.processEvents()
+while fg.running:
+  fg.processEvents()
 
   let viewProj = cam.getViewProjectionMatrix()
 
-  # Rotations & Model Updates
+  # Rotate separate model reference instances
   cube1.transform.rotateX(speed(1))
-  cube1.updateMVP(viewProj)
-
   cube2.transform.rotateX(speed(-1))
-  cube2.updateMVP(viewProj)
 
-  # Draw Frame using engine's active pipeline
-  engine.ctx.drawFrame(
-    engine.activePipeline, 
-    viewProj, 
-    [cube1.mesh, cube2.mesh], 
-    cam.transform.pos
-  )
 
-# 5. Complete Teardown (Handles GPU idle wait, pipeline, model, context, and window cleanup)
-engine.destroy()
+  # engine.update syncs and draws both objects
+  fg.update(cam.transform.pos, viewProj)
+
+# 5. Clean up
+fg.destroy()
