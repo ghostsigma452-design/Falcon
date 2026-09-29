@@ -1,4 +1,4 @@
-import vulkanContext, window, pipeline, sdl2, cglm, model, command
+import vulkanContext, window, pipeline, sdl2, cglm, model, builtins, command
 
 type 
   falconEngine* = object 
@@ -43,11 +43,23 @@ proc spawnModel*[V, I](
   indices: openArray[I],
   pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
   rot: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
-  scale: Vec3 = [1.0'f32, 1.0'f32, 1.0'f32]
+  scale: Vec3 = [0.25'f32, 0.25'f32, 0.25'f32]
 ): model =
   var m = fg.ctx.spawnModel(vertices, indices, pos, rot, scale)
   fg.models.add(m)
   result = m
+
+proc spawnModel*(
+  fg: var falconEngine,
+  model: tuple[vertices: seq[GPUVertex], indices: seq[uint32]],
+  pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
+  rot: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
+  scale: Vec3 = [0.25'f32, 0.25'f32, 0.25'f32]
+): model =
+  var m = fg.ctx.spawnModel(model[0], model[1], pos, rot, scale)
+  fg.models.add(m)
+  result = m
+
 
 # Engine Update Loop
 
