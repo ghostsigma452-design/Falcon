@@ -2,12 +2,10 @@ import falcon
 
 # 1. Initialize Engine
 var fg = newEngine("Falcon Engine - 2 Render Objects", 1000, 1000)
+var cubeModel = parseObj("cube.obj").format()
+var vertices = cubeModel[0]
+var indices = cubeModel[1]
 
-type
-  GPUVertex* = object
-    pos*: array[4, float32]
-    color*: array[4, float32]
-    normal*: array[4, float32]
 
 let cubeVertices*: seq[GPUVertex] = @[
   # Front Face (+Z)
@@ -63,8 +61,8 @@ fg.addPipeline(mainPipeline)
 
 # 3. Spawn Distinct Models
 var cube1 = fg.spawnModel(
-  cubeVertices, 
-  cubeIndices, 
+  vertices, 
+  indices, 
   pos = [-1.0'f32, 0.0'f32, -3.0'f32]
 )
 
