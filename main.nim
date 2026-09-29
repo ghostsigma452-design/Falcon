@@ -5,8 +5,8 @@ var fg = newEngine("Falcon Engine - 2 Render Objects", 1000, 1000)
 var cubeModel = parseObj("cube.obj").format()
 # 2. Setup Camera & Pipelines
 var cam = newCamera()
-let mainPipeline = fg.ctx.createPipeline("shaders/vert.spv", "shaders/frag.spv")
-fg.addPipeline(mainPipeline)
+discard fg.createPipeline("shaders/vert.spv", "shaders/frag.spv")
+
 
 # 3. Spawn Distinct Models
 var cube1 = fg.spawnModel(cubeModel,pos = [-1.0'f32, 0.0'f32, -3.0'f32])

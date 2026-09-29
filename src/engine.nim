@@ -23,6 +23,7 @@ proc newEngine*(title: string, width: int, height: int): falconEngine =
 
 # Pipeline Management
 
+
 proc addPipeline*(fg: var falconEngine, pipe: VulkanPipeline) =
   fg.pipelines.add(pipe)
   if fg.pipelines.len == 1:
@@ -34,6 +35,9 @@ proc setActivePipeline*(fg: var falconEngine, index: int) =
 
 proc setActivePipeline*(fg: var falconEngine, pipe: VulkanPipeline) =
   fg.activePipeline = pipe
+
+proc createPipeline*(fg: var falconEngine, vertPath, fragPath: string): VulkanPipeline =
+  fg.addPipeline(fg.ctx.createPipeline(vertPath, fragPath))
 
 # Model Spawning
 
