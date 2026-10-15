@@ -78,9 +78,21 @@ proc newVulkanDevice*(
   # 2. Specify required device features and extensions
   var deviceFeatures: VkPhysicalDeviceFeatures
 
-  # Dynamic Rendering Feature Enablement
+  # Enable Vulkan 1.2 Descriptor Indexing features for bindless textures
+  var deviceFeatures12 = VkPhysicalDeviceVulkan12Features(
+    sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+    pNext: nil,
+    descriptorIndexing: true.VkBool32,
+    shaderSampledImageArrayNonUniformIndexing: true.VkBool32,
+    descriptorBindingSampledImageUpdateAfterBind: true.VkBool32,
+    descriptorBindingPartiallyBound: true.VkBool32,
+    descriptorBindingVariableDescriptorCount: true.VkBool32
+  )
+
+  # Chain Vulkan 1.2 features into Dynamic Rendering features via pNext
   var dynamicRenderingFeatures = VkPhysicalDeviceDynamicRenderingFeatures(
     sType: VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES,
+    pNext: addr deviceFeatures12,
     dynamicRendering: true.VkBool32
   )
 
@@ -89,7 +101,7 @@ proc newVulkanDevice*(
     cstring("VK_KHR_dynamic_rendering")
   ]
 
-  # 3. Configure VkDeviceCreateInfo with pNext linked to dynamic rendering
+  # 3. Configure VkDeviceCreateInfo with pNext linked to the feature chain
   var createInfo: VkDeviceCreateInfo
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO
   createInfo.pNext = addr dynamicRenderingFeatures
@@ -97,7 +109,7 @@ proc newVulkanDevice*(
   createInfo.pQueueCreateInfos = addr queueCreateInfos[0]
   createInfo.pEnabledFeatures = addr deviceFeatures
   createInfo.enabledExtensionCount = extNames.len.uint32
-  createInfo.ppEnabledExtensionNames = cast[cstringArray](addr extNames[0]) # Cast applied here
+  createInfo.ppEnabledExtensionNames = cast[cstringArray](addr extNames[0])
 
   # 4. Create the Logical Device
   if vkCreateDevice(physicalDevice, addr createInfo, nil, addr result.logicalDevice) != VK_SUCCESS:
