@@ -17,7 +17,8 @@ type
     indexCount*: uint32
     sceneSSBO*: VulkanBuffer
     ssboPack*: SSBOPack
-    matrix*: Mat4 # Model transformation matrix
+    matrix*: Mat4          # Model transformation matrix
+    textureIndex*: uint32  # Bindless texture array index
 
   GPUSceneData* = object
     mvp*: Mat4
@@ -79,7 +80,8 @@ proc newRenderModel*[V, I](
     indexCount: indices.len.uint32,
     sceneSSBO: sceneSSBO,
     ssboPack: ssboPack,
-    matrix: modelMatrix
+    matrix: modelMatrix,
+    textureIndex: 0'u32
   )
 
 proc cleanup*(model: RenderModel) =
@@ -144,7 +146,8 @@ proc recordCommandBuffer*(
     models: openArray[RenderModel],
     viewProj: Mat4,
     cameraPos: Vec3,
-    pushConstants: openArray[PushConstantValue]
+    pushConstants: openArray[PushConstantValue],
+    bindlessDescriptorSet: VkDescriptorSet # <-- Added bindless textures set (Set 1)
 ) =
   var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
   discard vkBeginCommandBuffer(cb, addr beginInfo)
@@ -197,15 +200,15 @@ proc recordCommandBuffer*(
     var sceneData = GPUSceneData(mvp: viewProj)
     model.sceneSSBO.copyData(addr sceneData, sizeof(GPUSceneData).VkDeviceSize)
 
-    # Bind SSBO Descriptor Set (Set 0)
-    var descriptorSet = model.ssboPack.descriptorSet
+    # Bind Both Descriptor Sets: Set 0 (SSBOs) and Set 1 (Bindless Textures)
+    var descriptorSets = [model.ssboPack.descriptorSet, bindlessDescriptorSet]
     vkCmdBindDescriptorSets(
       cb,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
       pipeline.layout,
-      0'u32,
-      1'u32,
-      addr descriptorSet,
+      0'u32, # First set index
+      2'u32, # Number of sets to bind
+      addr descriptorSets[0],
       0,
       nil
     )
@@ -213,7 +216,7 @@ proc recordCommandBuffer*(
     # Bind Index Buffer
     vkCmdBindIndexBuffer(cb, model.indexBuffer, 0, VK_INDEX_TYPE_UINT32)
 
-    # Dynamic Push Constant Buffer Writing
+    # Dynamic Push Constant Buffer Writing (Total 104 bytes)
     pcBlock.clear()
     pcBlock.pushWrite(model.matrix) # 64 bytes (Offset 0)
     pcBlock.pushWrite(cameraPos)    # 12 bytes (Offset 64)
@@ -227,6 +230,9 @@ proc recordCommandBuffer*(
         pcBlock.pushWrite(pc.vec3Val)
       of pckMat4:
         pcBlock.pushWrite(pc.mat4Val)
+
+    # Push texture index at offset 100 (4 bytes)
+    pcBlock.pushWrite(model.textureIndex)
 
     # Flush packed byte array to GPU
     pcBlock.flush(
@@ -249,7 +255,8 @@ proc drawFrame*(
     models: openArray[RenderModel],
     viewProj: Mat4,
     cameraPos: Vec3,
-    pushConstants: openArray[PushConstantValue]
+    pushConstants: openArray[PushConstantValue],
+    bindlessDescriptorSet: VkDescriptorSet
 ) =
   discard vkWaitForFences(r.device, 1, addr r.inFlightFence, true.VkBool32, uint64.high)
   discard vkResetFences(r.device, 1, addr r.inFlightFence)
@@ -270,7 +277,8 @@ proc drawFrame*(
     models,
     viewProj,
     cameraPos,
-    pushConstants
+    pushConstants,
+    bindlessDescriptorSet
   )
 
   var waitSemaphores = [r.imageAvailableSemaphore]

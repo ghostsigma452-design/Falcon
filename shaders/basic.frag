@@ -1,21 +1,27 @@
 #version 450
+#extension GL_EXT_nonuniform_qualifier : require
 
 // Inputs from Vertex Shader
 layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) in vec3 fragNormal;
+layout(location = 2) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
-// Push Constants (Packed 100 bytes matching Nim's exact stream)
+// Set 1: Bindless Texture Array
+layout(set = 1, binding = 0) uniform sampler2D bindlessTextures[];
+
+// Push Constants (Packed 104 bytes total matching Nim's exact stream)
 layout(push_constant) uniform PBRPushBlock {
-    layout(offset = 0)  mat4 model;       // Offset 0   (64 bytes)
-    layout(offset = 64) vec3 cameraPos;   // Offset 64  (12 bytes)
-    layout(offset = 76) float albedoR;    // Offset 76  (4 bytes)
-    layout(offset = 80) float albedoG;    // Offset 80  (4 bytes)
-    layout(offset = 84) float albedoB;    // Offset 84  (4 bytes)
-    layout(offset = 88) float metallic;   // Offset 88  (4 bytes)
-    layout(offset = 92) float roughness;  // Offset 92  (4 bytes)
-    layout(offset = 96) float ao;         // Offset 96  (4 bytes)
+    layout(offset = 0)   mat4 model;        // Offset 0    (64 bytes)
+    layout(offset = 64)  vec3 cameraPos;    // Offset 64   (12 bytes)
+    layout(offset = 76)  float albedoR;     // Offset 76   (4 bytes)
+    layout(offset = 80)  float albedoG;     // Offset 80   (4 bytes)
+    layout(offset = 84)  float albedoB;     // Offset 84   (4 bytes)
+    layout(offset = 88)  float metallic;    // Offset 88   (4 bytes)
+    layout(offset = 92)  float roughness;   // Offset 92   (4 bytes)
+    layout(offset = 96)  float ao;          // Offset 96   (4 bytes)
+    layout(offset = 100) uint textureIndex; // Offset 100  (4 bytes) -> Total: 104 bytes
 } push;
 
 const float PI = 3.14159265359;
@@ -49,8 +55,11 @@ void main() {
     vec3 N = normalize(fragNormal);
     vec3 V = normalize(push.cameraPos - fragWorldPos);
 
-    // Reconstruct albedo vector from explicit float offsets
-    vec3 albedo = vec3(push.albedoR, push.albedoG, push.albedoB);
+    // Sample the bindless texture array dynamically using push.textureIndex
+    vec3 texColor = texture(bindlessTextures[0], fragTexCoord).rgb;
+
+    vec3 baseTint = vec3(push.albedoR, push.albedoG, push.albedoB);
+    vec3 albedo = baseTint * texColor;
 
     float metallic  = clamp(push.metallic, 0.0, 1.0);
     float roughness = clamp(push.roughness, 0.05, 1.0);
@@ -76,7 +85,7 @@ void main() {
     float NdotL = max(dot(N, L), 0.0001);
     vec3 specular = (NDF * G * F) / (4.0 * NdotV * NdotL);
 
-    vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);     
+    vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);      
 
     vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
 
@@ -87,5 +96,5 @@ void main() {
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2)); 
 
-    outColor = vec4(color, 1.0);
+    outColor = vec4(texColor, 1.0);
 }

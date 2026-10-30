@@ -1,12 +1,14 @@
-import vulkanContext, window, pipeline, sdl2, cglm, model, builtins, command
+import vulkanContext, window, pipeline, sdl2, cglm, model, builtins, command, descriptors, texture, vk14
 
 type 
   falconEngine* = object 
     ctx*: vulkanContext
     window*: VulkanWindow
-    models*: seq[model]           # Stores model instances
+    models*: seq[model]
     pipelines*: seq[VulkanPipeline]
     activePipeline*: VulkanPipeline
+    bindlessTextures*: BindlessTexturePack # Global bindless texture pack (Set 1)
+    textureSampler*: VkSampler            # Shared texture sampler
     event*: Event
     running*: bool
 
@@ -15,14 +17,19 @@ proc newEngine*(title: string, width: int, height: int): falconEngine =
   var ctx = newVk(win)
   ctx.initVk()
 
+  # Initialize global bindless descriptor pack and sampler
+  let bindlessPack = newBindlessTexturePack(ctx.device.logicalDevice)
+  let sampler = createTextureSampler(ctx.device.logicalDevice)
+
   result.ctx = ctx
   result.window = win
   result.models = @[]
   result.pipelines = @[]
+  result.bindlessTextures = bindlessPack
+  result.textureSampler = sampler
   result.running = true
 
 # Pipeline Management
-
 
 proc addPipeline*(fg: var falconEngine, pipe: VulkanPipeline) =
   fg.pipelines.add(pipe)
@@ -37,7 +44,9 @@ proc setActivePipeline*(fg: var falconEngine, pipe: VulkanPipeline) =
   fg.activePipeline = pipe
 
 proc createPipeline*(fg: var falconEngine, vertPath, fragPath: string): VulkanPipeline =
-  fg.addPipeline(fg.ctx.createPipeline(vertPath, fragPath))
+  let pipe = fg.ctx.createPipeline(vertPath, fragPath, [fg.bindlessTextures.layout])
+  fg.addPipeline(pipe)
+  result = pipe
 
 # Model Spawning
 
@@ -64,14 +73,13 @@ proc spawnModel*(
   fg.models.add(m)
   result = m
 
-
 # Engine Update Loop
 
 proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4) =
   var renderBatch = newSeq[RenderModel](engine.models.len)
 
   for idx in 0 ..< engine.models.len:
-    var m = engine.models[idx]  # Binds to a mutable 'var model' local reference
+    var m = engine.models[idx]
     m.updateMVP(viewProj)
     renderBatch[idx] = m.mesh
 
@@ -81,6 +89,7 @@ proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4) =
     renderBatch, 
     camPos
   )
+
 # Event Handling & Main Loop Control
 
 proc processEvents*(fg: var falconEngine) =
@@ -103,5 +112,4 @@ proc destroy*(fg: var falconEngine) =
 
   fg.ctx.destroy()
   fg.window.cleanup()
-  
   fg.running = false

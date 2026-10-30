@@ -1,7 +1,6 @@
 import command, cglm, entity, transform, buffer, vk14
 
 type
-
   model* = ref object of entity
     mesh*: RenderModel
 

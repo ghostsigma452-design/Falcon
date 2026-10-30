@@ -1,4 +1,4 @@
-import command, device, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform, depth, materials
+import command, device, swapchain, vkLoader, vk14, window, pipeline, model, cglm, helper, entity, transform, depth, materials, descriptors
 
 type
   vulkanContext* = ref object 
@@ -11,6 +11,7 @@ type
     depthResources*: DepthResources
     renderer*: VulkanRenderer
     globalLayout*: VkDescriptorSetLayout
+    bindlessTextures*: BindlessTexturePack # Stored centrally in context
 
 proc createGlobalDescriptorLayout(device: VkDevice): VkDescriptorSetLayout =
   var bindings: array[2, VkDescriptorSetLayoutBinding]
@@ -58,7 +59,8 @@ proc createPipeline*(
     vertPath, fragPath: string,
     extraLayouts: openArray[VkDescriptorSetLayout] = []
 ): VulkanPipeline =
-  var allLayouts = @[ctx.globalLayout]
+  # Automatically bind Set 0 (Global SSBO) and Set 1 (Bindless Textures)
+  var allLayouts = @[ctx.globalLayout, ctx.bindlessTextures.layout]
   for l in extraLayouts:
     allLayouts.add(l)
 
@@ -87,6 +89,10 @@ proc createPipeline*(
 
 proc initVk*(ctx: var vulkanContext) =
   let swapchain = newSwapchain(ctx, 1000, 1000)
+  
+  # Initialize bindless textures pack inside context
+  ctx.bindlessTextures = newBindlessTexturePack(ctx.device.logicalDevice)
+
   let renderer = newVulkanRenderer(
     ctx.instance,
     ctx.device.logicalDevice,
@@ -130,7 +136,8 @@ proc spawnModel*[V, I](
     component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
 
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = RubberPBR) =
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = DefaultPBRMaterial) =
+  # Pass context's bindless descriptor set down as an argument to the renderer
   drawFrame(
     ctx.renderer,
     ctx.swapchain,
@@ -139,7 +146,8 @@ proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, mo
     models,
     viewProj,
     cameraPos,
-    pushConstants
+    pushConstants,
+    ctx.bindlessTextures.descriptorSet
   )
 
 proc destroy*(ctx: vulkanContext) =

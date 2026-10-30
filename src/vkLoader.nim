@@ -181,6 +181,12 @@ proc loadLogicalDeviceProcs*(instance: VkInstance, device: VkDevice) =
   # Vertex & Index Binding
   loadDevProc(device, vkCmdBindVertexBuffers)
   loadDevProc(device, vkCmdBindIndexBuffer)
+  loadDevProc(device, vkCmdCopyBufferToImage)
+
+
+  loadDevProc(device, vkCreateSampler)
+
+  loadDevProc(device, vkCmdPipelineBarrier)
 
   # Push Constants
   loadDevProc(device, vkCmdPushConstants)
