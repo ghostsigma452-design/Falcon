@@ -11,7 +11,7 @@ type
     depthResources*: DepthResources
     renderer*: VulkanRenderer
     globalLayout*: VkDescriptorSetLayout
-    bindlessTextures*: BindlessTexturePack # Stored centrally in context
+    bindlessTextures*: BindlessTextures # Stored centrally in context
 
 proc createGlobalDescriptorLayout(device: VkDevice): VkDescriptorSetLayout =
   var bindings: array[2, VkDescriptorSetLayoutBinding]
@@ -60,7 +60,7 @@ proc createPipeline*(
     extraLayouts: openArray[VkDescriptorSetLayout] = []
 ): VulkanPipeline =
   # Automatically bind Set 0 (Global SSBO) and Set 1 (Bindless Textures)
-  var allLayouts = @[ctx.globalLayout, ctx.bindlessTextures.layout]
+  var allLayouts = @[ctx.globalLayout, ctx.bindlessTextures.setLayout]
   for l in extraLayouts:
     allLayouts.add(l)
 
@@ -91,7 +91,7 @@ proc initVk*(ctx: var vulkanContext) =
   let swapchain = newSwapchain(ctx, 1000, 1000)
   
   # Initialize bindless textures pack inside context
-  ctx.bindlessTextures = newBindlessTexturePack(ctx.device.logicalDevice)
+  ctx.bindlessTextures = newBindlessTextures(ctx.device.logicalDevice)
 
   let renderer = newVulkanRenderer(
     ctx.instance,

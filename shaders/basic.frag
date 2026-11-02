@@ -56,7 +56,7 @@ void main() {
     vec3 V = normalize(push.cameraPos - fragWorldPos);
 
     // Sample the bindless texture array dynamically using push.textureIndex
-    vec3 texColor = texture(bindlessTextures[0], fragTexCoord).rgb;
+    vec3 texColor = texture(bindlessTextures[nonuniformEXT(push.textureIndex)], fragTexCoord).rgb;
 
     vec3 baseTint = vec3(push.albedoR, push.albedoG, push.albedoB);
     vec3 albedo = baseTint * texColor;

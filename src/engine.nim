@@ -7,7 +7,7 @@ type
     models*: seq[model]
     pipelines*: seq[VulkanPipeline]
     activePipeline*: VulkanPipeline
-    bindlessTextures*: BindlessTexturePack # Global bindless texture pack (Set 1)
+    bindlessTextures*: BindlessTextures # Global bindless texture pack (Set 1)
     textureSampler*: VkSampler            # Shared texture sampler
     event*: Event
     running*: bool
@@ -17,15 +17,14 @@ proc newEngine*(title: string, width: int, height: int): falconEngine =
   var ctx = newVk(win)
   ctx.initVk()
 
-  # Initialize global bindless descriptor pack and sampler
-  let bindlessPack = newBindlessTexturePack(ctx.device.logicalDevice)
+  # Use the bindless descriptor pack already created by initVk on ctx
   let sampler = createTextureSampler(ctx.device.logicalDevice)
 
   result.ctx = ctx
   result.window = win
   result.models = @[]
   result.pipelines = @[]
-  result.bindlessTextures = bindlessPack
+  result.bindlessTextures = ctx.bindlessTextures  # Share the same descriptor set
   result.textureSampler = sampler
   result.running = true
 
@@ -44,7 +43,7 @@ proc setActivePipeline*(fg: var falconEngine, pipe: VulkanPipeline) =
   fg.activePipeline = pipe
 
 proc createPipeline*(fg: var falconEngine, vertPath, fragPath: string): VulkanPipeline =
-  let pipe = fg.ctx.createPipeline(vertPath, fragPath, [fg.bindlessTextures.layout])
+  let pipe = fg.ctx.createPipeline(vertPath, fragPath)
   fg.addPipeline(pipe)
   result = pipe
 

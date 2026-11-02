@@ -32,7 +32,6 @@ proc createTextureSampler*(device: VkDevice): VkSampler =
   if vkCreateSampler(device, addr samplerInfo, nil, addr result) != VK_SUCCESS:
     raise newException(Exception, "Failed to create texture sampler!")
 
-# Helper for single-time command buffer execution
 proc beginSingleTimeCommands(device: VkDevice, commandPool: VkCommandPool): VkCommandBuffer =
   var allocInfo = VkCommandBufferAllocateInfo(
     sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -58,7 +57,6 @@ proc endSingleTimeCommands(device: VkDevice, commandPool: VkCommandPool, graphic
     commandBufferCount: 1'u32,
     pCommandBuffers: addr commandBuffer
   )
-  # Fixed VkQueueSubmit argument types (1'u32 count and VkFence(0))
   discard vkQueueSubmit(graphicsQueue, 1'u32, addr submitInfo, VkFence(0))
   discard vkQueueWaitIdle(graphicsQueue)
   vkFreeCommandBuffers(device, commandPool, 1'u32, addr commandBuffer)
@@ -98,7 +96,6 @@ proc transitionImageLayout(device: VkDevice, commandPool: VkCommandPool, graphic
   else:
     raise newException(Exception, "Unsupported layout transition!")
 
-  # Fixed argument types and distinct casts for VkCmdPipelineBarrier
   vkCmdPipelineBarrier(
     commandBuffer,
     sourceStage,
@@ -141,16 +138,15 @@ proc loadTexture*(
     path: string,
     textureIndex: uint32
 ): Texture =
-  # 1. Load image using stbi wrapper
-  var width, height, channels: int
-  let data = stbi.load(path, width, height, channels ,RGBA)
+  var width, height, fileChannels: int
+  let data = stbi.load(path, width, height, fileChannels, RGBA)
   
   if data.len == 0:
     raise newException(Exception, "Failed to load image file: " & path)
 
+  const channels = 4
   let imageSize = (width * height * channels).VkDeviceSize
 
-  # 2. Create Staging Buffer
   var stagingBuffer = newVulkanBuffer(
     physicalDevice, device,
     imageSize,
@@ -159,8 +155,7 @@ proc loadTexture*(
   )
   copyData(stagingBuffer, unsafeAddr data[0], imageSize)
 
-  # 3. Create Vulkan Image
-  let vkFormat = if channels == 4: VK_FORMAT_R8G8B8A8_SRGB else: VK_FORMAT_R8G8B8_SRGB
+  let vkFormat = VK_FORMAT_R8G8B8A8_SRGB
 
   var imageInfo = VkImageCreateInfo(
     sType: VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -179,7 +174,6 @@ proc loadTexture*(
   if vkCreateImage(device, addr imageInfo, nil, addr result.image) != VK_SUCCESS:
     raise newException(Exception, "Failed to create Vulkan texture image!")
 
-  # 4. Allocate and Bind Device Memory
   var memRequirements: VkMemoryRequirements
   vkGetImageMemoryRequirements(device, result.image, addr memRequirements)
 
@@ -192,15 +186,12 @@ proc loadTexture*(
   if vkAllocateMemory(device, addr allocInfo, nil, addr result.memory) != VK_SUCCESS:
     raise newException(Exception, "Failed to allocate texture image memory!")
   
-  # Discard result of vkBindImageMemory (returns VkResult)
   discard vkBindImageMemory(device, result.image, result.memory, 0)
 
-  # 5. Transition layout, copy buffer to image, transition to shader read-only
   transitionImageLayout(device, commandPool, graphicsQueue, result.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
   copyBufferToImage(device, commandPool, graphicsQueue, stagingBuffer.buffer, result.image, width.uint32, height.uint32)
   transitionImageLayout(device, commandPool, graphicsQueue, result.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
-  # 6. Create Image View
   var viewInfo = VkImageViewCreateInfo(
     sType: VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     image: result.image,
@@ -218,7 +209,6 @@ proc loadTexture*(
   if vkCreateImageView(device, addr viewInfo, nil, addr result.view) != VK_SUCCESS:
     raise newException(Exception, "Failed to create texture image view!")
 
-  # 7. Update the Bindless Descriptor Set at `set = 1`
   var imageDescriptorInfo = VkDescriptorImageInfo(
     sampler: sampler,
     imageView: result.view,

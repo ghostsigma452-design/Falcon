@@ -147,7 +147,7 @@ proc recordCommandBuffer*(
     viewProj: Mat4,
     cameraPos: Vec3,
     pushConstants: openArray[PushConstantValue],
-    bindlessDescriptorSet: VkDescriptorSet # <-- Added bindless textures set (Set 1)
+    bindlessDescriptorSet: VkDescriptorSet
 ) =
   var beginInfo = VkCommandBufferBeginInfo(sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
   discard vkBeginCommandBuffer(cb, addr beginInfo)
