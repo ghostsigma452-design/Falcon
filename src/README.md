@@ -61,8 +61,8 @@ Ensure the following tools and packages are installed:
 
 Compile the GLSL shaders to SPIR-V:
 ```sh
-glslangValidator -V shaders/basic.vert -o shaders/vert.spv
-glslangValidator -V shaders/basic.frag -o shaders/frag.spv
+glslc shaders/basic.vert -o shaders/vert.spv
+glslc shaders/basic.frag -o shaders/frag.spv
 ```
 
 Run in development mode:
