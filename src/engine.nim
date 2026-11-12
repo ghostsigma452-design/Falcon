@@ -66,9 +66,11 @@ proc spawnModel*(
   model: tuple[vertices: seq[GPUVertex], indices: seq[uint32]],
   pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
   rot: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
-  scale: Vec3 = [0.25'f32, 0.25'f32, 0.25'f32]
+  scale: Vec3 = [0.25'f32, 0.25'f32, 0.25'f32],
+  textureID: uint32 = 0
 ): model =
   var m = fg.ctx.spawnModel(model[0], model[1], pos, rot, scale)
+  m.mesh.textureIndex = textureID
   fg.models.add(m)
   result = m
 
@@ -88,6 +90,20 @@ proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4) =
     renderBatch, 
     camPos
   )
+
+proc loadTexture*(fg: falconEngine, path: string, id: uint32): Texture =
+  var textureSampler = createTextureSampler(fg.ctx.device.logicalDevice)
+  var myTexture = loadTexture(
+  fg.ctx.device.logicalDevice,
+  fg.ctx.physicalDevice,
+  fg.ctx.renderer.commandPool,
+  fg.ctx.renderer.graphicsQueue,
+  fg.bindlessTextures.descriptorSet,
+  textureSampler,
+  "grass.png",
+  id # Bindless Array Index 0
+  )
+  return myTexture
 
 # Event Handling & Main Loop Control
 

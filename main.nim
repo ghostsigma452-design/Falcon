@@ -13,25 +13,13 @@ var cam = newCamera(
 discard fg.createPipeline("shaders/vert.spv", "shaders/frag.spv")
 
 # 3. Load Texture into Bindless Array Slot 0 (Set 1)
-var textureSampler = createTextureSampler(fg.ctx.device.logicalDevice)
-var myTexture = loadTexture(
-  fg.ctx.device.logicalDevice,
-  fg.ctx.physicalDevice,
-  fg.ctx.renderer.commandPool,
-  fg.ctx.renderer.graphicsQueue,
-  fg.bindlessTextures.descriptorSet,
-  textureSampler,
-  "grass.png",
-  0'u32 # Bindless Array Index 0
-)
+discard fg.loadTexture("grass.png", 0)
 
 # 4. Spawn Distinct Models
-var cube1 = fg.spawnModel(cubeModel, pos = [-1.2'f32, 0.0'f32, -3.0'f32])
-var cube2 = fg.spawnModel(cubeModel, pos = [2.1'f32, 2.0'f32, -3.0'f32])
+var cube1 = spawnModel(fg, cubeModel, pos = [-1.2'f32, 0.0'f32, -3.0'f32], textureID = 0'u32)   
+var cube2 = fg.spawnModel(cubeModel, pos = [2.1'f32, 2.0'f32, -3.0'f32], textureID = 0'u32)
 
-# Assign bindless texture index to each mesh instance
-cube1.mesh.textureIndex = 0'u32
-cube2.mesh.textureIndex = 0'u32
+
 
 # 5. Main Render Loop
 while fg.running:
