@@ -1,4 +1,4 @@
-import vulkanContext, window, pipeline, sdl2, cglm, model, builtins, command, descriptors, texture, vk14
+import vulkanContext, window, pipeline, sdl2, cglm, model, builtins, command, descriptors, texture, vk14, materials
 
 type 
   falconEngine* = object 
@@ -76,7 +76,7 @@ proc spawnModel*(
 
 # Engine Update Loop
 
-proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4) =
+proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4, pushConstants: material = PlasticPBR) =
   var renderBatch = newSeq[RenderModel](engine.models.len)
 
   for idx in 0 ..< engine.models.len:
@@ -88,7 +88,8 @@ proc update*(engine: falconEngine, camPos: Vec3, viewProj: Mat4) =
     engine.activePipeline, 
     viewProj, 
     renderBatch, 
-    camPos
+    camPos,
+    pushConstants = pushConstants
   )
 
 proc loadTexture*(fg: falconEngine, path: string, id: uint32): Texture =

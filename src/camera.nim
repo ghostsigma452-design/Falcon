@@ -13,7 +13,7 @@ proc transform*(cam: Camera): var Transform =
 
 # Constructor
 proc newCamera*(
-    pos: Vec3 = [0.0'f32, 0.0'f32, 0.0'f32],
+    pos: Vec3 = [0.0'f32, 1.0'f32, 4.0'f32],
     fov: float32 = 0.785398'f32, # ~45 degrees in radians
     aspectRatio: float32 = 1.0'f32,
     nearPlane: float32 = 0.1'f32,

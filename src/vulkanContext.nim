@@ -136,7 +136,7 @@ proc spawnModel*[V, I](
     component(transform: Transform(pos: pos, rot: rot, scale: scale))
   ]
 
-proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material = DefaultPBRMaterial) =
+proc drawFrame*(ctx: vulkanContext, pipeline: VulkanPipeline, viewProj: Mat4, models: openArray[RenderModel], cameraPos: Vec3, pushConstants: material) =
   # Pass context's bindless descriptor set down as an argument to the renderer
   drawFrame(
     ctx.renderer,
